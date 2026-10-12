@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Gelir & Gider Paneli</title>
+<title>Tostçu Kurtalan · Gelir & Gider</title>
 <style>
 :root{--bg:#f4f5f7;--surface:#fff;--surface2:#f6f7f9;--border:#e4e7ec;--text:#111827;--muted:#6b7280;--primary:#4f46e5;--primary-soft:#eef2ff;--green:#059669;--green-soft:#ecfdf5;--red:#dc2626;--red-soft:#fef2f2;--amber:#b45309;--amber-soft:#fffbeb;--blue:#2563eb;--blue-soft:#eff6ff;--radius:12px;--shadow:0 1px 2px rgba(16,24,40,.05),0 1px 3px rgba(16,24,40,.07)}
 :root[data-theme=dark]{--bg:#0d1117;--surface:#161b22;--surface2:#1d232c;--border:#2a313c;--text:#e6edf3;--muted:#8b949e;--primary:#6366f1;--primary-soft:#23214d;--green:#34d399;--green-soft:#0b2a20;--red:#f87171;--red-soft:#2d1417;--amber:#fbbf24;--amber-soft:#2b2108;--blue:#60a5fa;--blue-soft:#132339;--shadow:none}
@@ -136,8 +136,8 @@ tfoot td{font-weight:650;border-top:1px solid var(--border);border-bottom:0;back
 <div id="login" class="login">
   <form class="login-card" onsubmit="return doLogin(event)">
     <div class="logo">₺</div>
-    <h1>Gelir & Gider Paneli</h1>
-    <p class="muted">Yönetici girişi</p>
+    <h1>Tostçu Kurtalan</h1>
+    <p class="muted">Gelir & Gider Paneli · Yönetici girişi</p>
     <input id="pw" type="password" inputmode="numeric" placeholder="••••••" autocomplete="current-password" aria-label="Şifre">
     <div id="pwErr" class="err"></div>
     <button class="btn primary block">Giriş Yap</button>
@@ -188,6 +188,7 @@ tfoot td{font-weight:650;border-top:1px solid var(--border);border-bottom:0;back
    ============================================================ */
 const PASS = '001002';
 const KEY = 'kasaStokPaneli_v1';
+const DEFAULT_NAME = 'Tostçu Kurtalan';
 const INC_M = {nakit:'Nakit', pos:'POS (Kart)', havale:'Havale / EFT'};
 const EXP_M = {nakit:'Nakit', kart:'Kart', havale:'Havale / EFT'};
 // 'stok' anahtarı eski kayıtlarla uyum için korunuyor; arayüzde "Malzeme" olarak görünür
@@ -243,7 +244,7 @@ function seed() {
   const diger = ['Ekmek','Ambalaj / Sarf Malzeme','Temizlik','Bakım / Onarım','Diğer'];
   return {
     v:2,
-    settings:{name:'İşletmem', posRate:0},
+    settings:{name:DEFAULT_NAME, posRate:0},
     cats:[
       ...malzeme.map(n => ({id:uid(), name:n, type:'stok'})),
       ...sabit.map(n => ({id:uid(), name:n, type:'sabit'})),
@@ -256,6 +257,7 @@ function seed() {
 function load() { try { const d = JSON.parse(localStorage.getItem(KEY)); return d && d.cats ? d : null; } catch { return null; } }
 function save() { try { localStorage.setItem(KEY, JSON.stringify(db)); } catch (e) { toast('Kaydedilemedi: tarayıcı depolaması dolu veya kapalı'); } }
 let db = load() || seed();
+if (db.settings.name === 'İşletmem') db.settings.name = DEFAULT_NAME;  // eski varsayılan addan geçiş
 if (!load()) save();
 
 const catById = id => db.cats.find(c => c.id === id) || {id, name:'(silinmiş kategori)', type:'diger'};
@@ -602,7 +604,7 @@ function addExp(e) {
 function saveSettings(e) {
   e.preventDefault();
   const f = new FormData(e.target);
-  db.settings.name = f.get('name').trim() || 'İşletmem';
+  db.settings.name = f.get('name').trim() || DEFAULT_NAME;
   db.settings.posRate = Math.max(0, toNum(f.get('posRate')));
   save(); render(); toast('Ayarlar kaydedildi');
   return false;
@@ -677,7 +679,7 @@ $('#restoreFile').addEventListener('change', e => {
       if (!Array.isArray(d.cats) || !Array.isArray(d.inc) || !Array.isArray(d.exp)) throw 0;
       delete d.mov;
       if (!confirm(`Yedekte ${d.inc.length} gelir, ${d.exp.length} gider kaydı var. Mevcut verilerin yerine yüklensin mi?`)) return;
-      d.settings ||= {name:'İşletmem', posRate:0};
+      d.settings ||= {name:DEFAULT_NAME, posRate:0};
       db = d; save(); render(); toast('Yedek yüklendi');
     } catch { toast('Geçersiz yedek dosyası'); }
   };
