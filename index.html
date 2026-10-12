@@ -143,9 +143,9 @@ tfoot td{font-weight:650;border-top:1px solid var(--border);border-bottom:0;back
     <div class="logo">₺</div>
     <h1>Tostça Kurtalan</h1>
     <p class="muted">Gelir & Gider Paneli · Yönetici girişi</p>
-    <input id="pw" type="password" inputmode="numeric" placeholder="••••••" autocomplete="current-password" aria-label="Şifre">
+    <input id="pw" type="password" inputmode="numeric" placeholder="••••••" autocomplete="current-password" aria-label="Şifre" required>
     <div id="pwErr" class="err"></div>
-    <button class="btn primary block">Giriş Yap</button>
+    <button class="btn primary block" id="loginBtn">Giriş Yap</button>
   </form>
 </div>
 
@@ -184,15 +184,21 @@ tfoot td{font-weight:650;border-top:1px solid var(--border);border-bottom:0;back
 <input type="file" id="restoreFile" accept=".json,application/json" hidden>
 <div id="toast"></div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script>
 /* ============================================================
-   Gelir & Gider Paneli — tek dosya, çevrimdışı çalışır.
-   Veriler bu tarayıcının localStorage alanında tutulur.
-   Not: Şifre kontrolü tarayıcı tarafındadır; dosyaya erişen biri
-   kodu okuyabilir. Düzenli olarak Ayarlar > Yedek Al yapın.
+   Tostça Kurtalan · Gelir & Gider Paneli
+   Kayıtlar Supabase'de (bulutta) saklanır: her cihazdan aynı kayıtlar
+   görünür. Giriş Supabase Auth (e-posta + şifre) ile yapılır; kayıtlar
+   RLS ile yalnızca giriş yapan kullanıcıya açıktır.
+   Tablo kurulumu: supabase/kurulum.sql
    ============================================================ */
-const PASS = '001002';
-const KEY = 'kasaStokPaneli_v1';
+const SB_URL = 'https://mbpprgomyvxwxqavcufp.supabase.co';
+const SB_KEY = 'sb_publishable_OwYLIu09emtc4jNT9FD2tg_TaPziTDK';  // publishable key: tarayıcıda görünmesi güvenli, erişimi RLS belirler
+const OLD_KEY = 'kasaStokPaneli_v1';  // eski sürümün (yalnızca tarayıcıda saklanan) verisi
+// Tek kullanıcılı panel: giriş ekranında sadece şifre sorulur, Supabase hesabı sabittir.
+// Şifre kodda değil, Supabase'de tutulur ve orada doğrulanır.
+const LOGIN_EMAIL = 'tostca-kurtalan@gmail.com';
 const DEFAULT_NAME = 'Tostça Kurtalan';
 const INC_M = {nakit:'Nakit', pos:'POS (Kart)', havale:'Havale / EFT'};
 const EXP_M = {nakit:'Nakit', kart:'Kart', havale:'Havale / EFT'};
@@ -242,29 +248,98 @@ const IC = {
   plus:'<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>'
 };
 
-/* ---------- veri ---------- */
-function seed() {
+/* ---------- veri (Supabase) ---------- */
+function defaultCats() {
   const malzeme = ['Kola / Su / Meyve Suyu','Sucuk','Kaşar','Et','Tavuk','Margarin','Salam','Patates','Ketçap / Mayonez','Sebze'];
   const sabit = ['Kira','Elektrik','Doğalgaz','Su Faturası','Personel Maaşı','İnternet / Telefon'];
   const diger = ['Ekmek','Ambalaj / Sarf Malzeme','Temizlik','Bakım / Onarım','Diğer'];
-  return {
-    v:2,
-    settings:{name:DEFAULT_NAME, posRate:0},
-    cats:[
-      ...malzeme.map(n => ({id:uid(), name:n, type:'stok'})),
-      ...sabit.map(n => ({id:uid(), name:n, type:'sabit'})),
-      ...diger.map(n => ({id:uid(), name:n, type:'diger'}))
-    ],
-    inc:[],  // {id,ts,date,method,amount,note}
-    exp:[]   // {id,ts,date,catId,amount,method,note}
+  // id başındaki sıra numarası, kalemlerin listede bu sırayla görünmesini sağlar
+  return [...malzeme.map(n => [n, 'stok']), ...sabit.map(n => [n, 'sabit']), ...diger.map(n => [n, 'diger'])]
+    .map(([name, type], i) => ({id:'k' + String(i).padStart(3, '0') + '-' + uid(), name, type}));
+}
+const sb = window.supabase ? window.supabase.createClient(SB_URL, SB_KEY) : null;
+let user = null;
+let db = {settings:{name:DEFAULT_NAME, posRate:0}, cats:[], inc:[], exp:[]};
+
+// Supabase çağrısı: hata varsa kullanıcıya bildir ve fırlat
+async function q(p) {
+  const {data, error} = await p;
+  if (error) {
+    console.error(error);
+    toast(/fetch|network/i.test(error.message) ? 'İnternet bağlantısı yok — işlem yapılamadı' : 'İşlem başarısız: ' + error.message);
+    throw error;
+  }
+  return data;
+}
+// Supabase tek seferde en fazla 1000 satır döndürür; hepsini parça parça çek
+async function fetchAll(table, cols) {
+  const out = [];
+  for (let from = 0; ; from += 1000) {
+    const rows = await q(sb.from(table).select(cols).order('id').range(from, from + 999));
+    out.push(...rows);
+    if (rows.length < 1000) return out;
+  }
+}
+const chunks = (arr, n) => Array.from({length:Math.ceil(arr.length / n)}, (_, i) => arr.slice(i * n, i * n + n));
+const incRow = x => ({id:x.id, date:x.date, method:x.method, amount:x.amount, note:x.note || '', ts:x.ts});
+const expRow = x => ({id:x.id, date:x.date, cat_id:x.catId, amount:x.amount, method:x.method, note:x.note || '', ts:x.ts});
+
+async function loadAll() {
+  const [cats, inc, exp, set] = await Promise.all([
+    fetchAll('kalemler', 'id,name,type,created_at'),
+    fetchAll('gelirler', 'id,date,method,amount,note,ts'),
+    fetchAll('giderler', 'id,date,cat_id,amount,method,note,ts'),
+    q(sb.from('ayarlar').select('name,pos_rate').maybeSingle())
+  ]);
+  cats.sort((a, b) => a.created_at.localeCompare(b.created_at) || a.id.localeCompare(b.id));
+  db = {
+    settings:{name:set?.name || DEFAULT_NAME, posRate:Number(set?.pos_rate || 0)},
+    cats:cats.map(({id, name, type}) => ({id, name, type})),
+    inc:inc.map(r => ({...r, amount:Number(r.amount), ts:Number(r.ts)})),
+    exp:exp.map(r => ({id:r.id, date:r.date, catId:r.cat_id, amount:Number(r.amount), method:r.method, note:r.note, ts:Number(r.ts)}))
   };
 }
-function load() { try { const d = JSON.parse(localStorage.getItem(KEY)); return d && d.cats ? d : null; } catch { return null; } }
-function save() { try { localStorage.setItem(KEY, JSON.stringify(db)); } catch (e) { toast('Kaydedilemedi: tarayıcı depolaması dolu veya kapalı'); } }
-let db = load() || seed();
-// eski varsayılan adlardan geçiş — hemen kaydedilir ki eski ad geri gelmesin
-if (['İşletmem', 'Tostçu Kurtalan'].includes(db.settings.name)) { db.settings.name = DEFAULT_NAME; save(); }
-if (!load()) save();
+// Bir yedeği (veya eski tarayıcı verisini) buluta yükler
+async function uploadAll(d) {
+  const cats = (d.cats || []).map(c => ({id:c.id, name:c.name, type:c.type}));
+  const ids = new Set(cats.map(c => c.id));
+  // silinmiş bir kaleme bağlı eski gider varsa, kayıt kaybolmasın diye kalemi yeniden oluştur
+  (d.exp || []).forEach(x => { if (!ids.has(x.catId)) { ids.add(x.catId); cats.push({id:x.catId, name:'(silinmiş kalem)', type:'diger'}); } });
+  for (const c of chunks(cats, 500)) await q(sb.from('kalemler').upsert(c));
+  for (const c of chunks((d.inc || []).map(incRow), 500)) await q(sb.from('gelirler').upsert(c));
+  for (const c of chunks((d.exp || []).map(expRow), 500)) await q(sb.from('giderler').upsert(c));
+  const name = !d.settings?.name || ['İşletmem', 'Tostçu Kurtalan'].includes(d.settings.name) ? DEFAULT_NAME : d.settings.name;
+  await q(sb.from('ayarlar').upsert({owner:user.id, name, pos_rate:Number(d.settings?.posRate || 0)}));
+}
+async function deleteAll() {
+  // sıra önemli: giderler kalemlere bağlı
+  for (const t of ['giderler', 'gelirler', 'kalemler']) await q(sb.from(t).delete().not('id', 'is', null));
+}
+async function seedCloud() {
+  await q(sb.from('kalemler').insert(defaultCats()));
+  await q(sb.from('ayarlar').upsert({owner:user.id, name:DEFAULT_NAME, pos_rate:0}));
+}
+// İlk girişte: kalem yoksa varsayılanları oluştur, bu tarayıcıda eski kayıt varsa aktarmayı öner
+async function firstSetup() {
+  if (db.cats.length) return;
+  let old = null; try { old = JSON.parse(localStorage.getItem(OLD_KEY)); } catch {}
+  const n = old && Array.isArray(old.cats) ? (old.inc || []).length + (old.exp || []).length : 0;
+  if (n && confirm(`Bu tarayıcıda daha önce girilmiş ${(old.inc || []).length} gelir ve ${(old.exp || []).length} gider kaydı bulundu.\nBuluta aktarılsın mı?`)) {
+    await uploadAll(old);
+    try { localStorage.setItem(OLD_KEY + '_aktarildi', localStorage.getItem(OLD_KEY)); localStorage.removeItem(OLD_KEY); } catch {}
+    toast(n + ' kayıt buluta aktarıldı');
+  } else {
+    await seedCloud();
+  }
+  await loadAll();
+}
+// Form gönderilirken düğmeyi kilitler (çift kayıt olmasın)
+async function busy(form, fn) {
+  const b = form.querySelector('button');
+  if (b.disabled) return;
+  b.disabled = true;
+  try { await fn(); } catch {} finally { b.disabled = false; }
+}
 
 const catById = id => db.cats.find(c => c.id === id) || {id, name:'(silinmiş kategori)', type:'diger'};
 
@@ -556,13 +631,13 @@ R.ayar = () => `
       </form>
       <p class="hint">POS oranı girilirse kart tahsilatlarından komisyon düşülerek net kâr hesaplanır. 0 bırakırsanız hesaba katılmaz.</p>
     </div>
-    <div class="card"><h3>Yedekleme <small>veriler yalnızca bu tarayıcıda saklanır</small></h3>
+    <div class="card"><h3>Yedekleme <small>kayıtlar bulutta saklanır, her cihazdan aynı veriler görünür</small></h3>
       <div class="chips">
         <button class="btn primary" data-act="backup">${I(IC.dl, 16)} Yedek Al (JSON)</button>
         <button class="btn" data-act="restore">${I(IC.ul, 16)} Yedekten Yükle</button>
         <button class="btn danger" data-act="reset">${I(IC.trash, 16)} Tüm Verileri Sil</button>
       </div>
-      <p class="hint">Haftada en az bir kez yedek alın. Tarayıcı geçmişi/çerezleri temizlenirse veriler silinebilir. Yedek dosyasını başka bilgisayarda “Yedekten Yükle” ile açabilirsiniz.</p>
+      <p class="hint">Kayıtlar Supabase bulutunda saklanır; tarayıcı temizlense de kaybolmaz. Yine de ayda bir yedek almanız önerilir. “Yedekten Yükle” buluttaki kayıtların yerine yedeği yükler.</p>
       <p class="hint">Kayıt sayısı: ${db.inc.length} gelir · ${db.exp.length} gider</p>
     </div>
   </div>
@@ -587,13 +662,13 @@ R.ayar = () => `
 function addInc(e) {
   e.preventDefault();
   const f = new FormData(e.target), date = f.get('date'), note = f.get('note').trim();
-  let n = 0;
-  for (const m of ['nakit', 'pos', 'havale']) {
-    const v = toNum(f.get(m));
-    if (v > 0) { db.inc.push({id:uid(), ts:Date.now(), date, method:m, amount:v, note}); n++; }
-  }
-  if (!n) { toast('En az bir tutar girin'); return false; }
-  mem.incDate = date; save(); render(); toast(n + ' gelir kaydı eklendi');
+  const rows = ['nakit', 'pos', 'havale'].map(m => ({id:uid(), ts:Date.now(), date, method:m, amount:toNum(f.get(m)), note})).filter(x => x.amount > 0);
+  if (!rows.length) { toast('En az bir tutar girin'); return false; }
+  busy(e.target, async () => {
+    await q(sb.from('gelirler').insert(rows.map(incRow)));
+    db.inc.push(...rows);
+    mem.incDate = date; render(); toast(rows.length + ' gelir kaydı eklendi');
+  });
   return false;
 }
 function addExp(e) {
@@ -602,17 +677,22 @@ function addExp(e) {
   const amount = toNum(f.get('amount'));
   if (amount <= 0) { toast('Geçerli bir tutar girin'); return false; }
   const x = {id:uid(), ts:Date.now(), date:f.get('date'), catId:c.id, amount, method:f.get('method'), note:f.get('note').trim()};
-  db.exp.push(x);
-  Object.assign(mem, {expDate:x.date, expCat:c.id, expMethod:x.method});
-  save(); render(); toast('Gider kaydedildi: ' + c.name);
+  busy(e.target, async () => {
+    await q(sb.from('giderler').insert(expRow(x)));
+    db.exp.push(x);
+    Object.assign(mem, {expDate:x.date, expCat:c.id, expMethod:x.method});
+    render(); toast('Gider kaydedildi: ' + c.name);
+  });
   return false;
 }
 function saveSettings(e) {
   e.preventDefault();
   const f = new FormData(e.target);
-  db.settings.name = f.get('name').trim() || DEFAULT_NAME;
-  db.settings.posRate = Math.max(0, toNum(f.get('posRate')));
-  save(); render(); toast('Ayarlar kaydedildi');
+  const name = f.get('name').trim() || DEFAULT_NAME, posRate = Math.min(99, Math.max(0, toNum(f.get('posRate'))));
+  busy(e.target, async () => {
+    await q(sb.from('ayarlar').upsert({owner:user.id, name, pos_rate:posRate}));
+    db.settings = {name, posRate}; render(); toast('Ayarlar kaydedildi');
+  });
   return false;
 }
 function addCat(e) {
@@ -621,8 +701,16 @@ function addCat(e) {
   if (!name) return false;
   if (db.cats.some(c => c.name.toLocaleLowerCase('tr') === name.toLocaleLowerCase('tr'))) { toast('Bu isimde kalem zaten var'); return false; }
   const c = {id:uid(), name, type};
-  db.cats.push(c); save(); render(); toast('“' + name + '” eklendi');
+  busy(e.target, async () => {
+    await q(sb.from('kalemler').insert(c));
+    db.cats.push(c); render(); toast('“' + name + '” eklendi');
+  });
   return false;
+}
+async function delRow(table, key, id, msg) {
+  if (!confirm(msg)) return;
+  try { await q(sb.from(table).delete().eq('id', id)); } catch { return; }
+  db[key] = db[key].filter(x => x.id !== id); render(); toast('Silindi');
 }
 function download(name, text, mime) {
   const a = document.createElement('a');
@@ -650,46 +738,61 @@ document.addEventListener('click', e => {
   const id = el.dataset.id;
   switch (el.dataset.act) {
     case 'nav': view = el.dataset.v; render(); window.scrollTo(0, 0); break;
-    case 'del-inc': if (confirm('Bu gelir kaydı silinsin mi?')) { db.inc = db.inc.filter(x => x.id !== id); save(); render(); toast('Silindi'); } break;
-    case 'del-exp': if (confirm('Bu gider kaydı silinsin mi?')) { db.exp = db.exp.filter(x => x.id !== id); save(); render(); toast('Silindi'); } break;
-    case 'del-cat': if (confirm('Bu kalem silinsin mi?')) { db.cats = db.cats.filter(c => c.id !== id); save(); render(); toast('Silindi'); } break;
+    case 'del-inc': delRow('gelirler', 'inc', id, 'Bu gelir kaydı silinsin mi?'); break;
+    case 'del-exp': delRow('giderler', 'exp', id, 'Bu gider kaydı silinsin mi?'); break;
+    case 'del-cat': delRow('kalemler', 'cats', id, 'Bu kalem silinsin mi?'); break;
     case 'theme': setTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark'); break;
-    case 'logout': try { sessionStorage.removeItem('kasaAuth'); } catch {} location.reload(); break;
+    case 'logout': if (confirm('Çıkış yapılsın mı?')) sb.auth.signOut().finally(() => location.reload()); break;
     case 'print': window.print(); break;
     case 'csv': exportCSV(); toast('CSV indirildi — Excel ile açabilirsiniz'); break;
-    case 'backup': download(`kasa-yedek_${today()}.json`, JSON.stringify(db, null, 1), 'application/json'); toast('Yedek indirildi'); break;
+    case 'backup': download(`tostca-kurtalan-yedek_${today()}.json`, JSON.stringify(db, null, 1), 'application/json'); toast('Yedek indirildi'); break;
     case 'restore': $('#restoreFile').click(); break;
     case 'reset':
-      if (confirm('TÜM gelir ve gider kayıtları silinecek. Önce yedek almanız önerilir. Devam edilsin mi?') && prompt('Onay için SİL yazın') === 'SİL') {
-        db = seed(); save(); render(); toast('Tüm veriler silindi');
+      if (confirm('TÜM gelir ve gider kayıtları buluttan silinecek. Önce yedek almanız önerilir. Devam edilsin mi?') && prompt('Onay için SİL yazın') === 'SİL') {
+        (async () => {
+          try { await deleteAll(); await seedCloud(); await loadAll(); } catch { return; }
+          render(); toast('Tüm veriler silindi');
+        })();
       }
       break;
   }
 });
-document.addEventListener('change', e => {
+document.addEventListener('change', async e => {
   const el = e.target;
-  if (el.dataset.cf) {
+  if (el.dataset.cf === 'name') {
     const c = db.cats.find(x => x.id === el.dataset.id); if (!c) return;
-    const f = el.dataset.cf, v = el.value.trim();
-    if (f === 'name' && !v) { el.value = c.name; return; }
-    c[f] = v;
-    save(); toast('Güncellendi');
+    const v = el.value.trim();
+    if (!v || v === c.name) { el.value = c.name; return; }
+    try { await q(sb.from('kalemler').update({name:v}).eq('id', c.id)); } catch { el.value = c.name; return; }
+    c.name = v; toast('Güncellendi');
   }
 });
 $('#restoreFile').addEventListener('change', e => {
   const file = e.target.files[0]; if (!file) return;
   const r = new FileReader();
-  r.onload = () => {
+  r.onload = async () => {
+    let d;
     try {
-      const d = JSON.parse(r.result);
+      d = JSON.parse(r.result);
       if (!Array.isArray(d.cats) || !Array.isArray(d.inc) || !Array.isArray(d.exp)) throw 0;
-      delete d.mov;
-      if (!confirm(`Yedekte ${d.inc.length} gelir, ${d.exp.length} gider kaydı var. Mevcut verilerin yerine yüklensin mi?`)) return;
-      d.settings ||= {name:DEFAULT_NAME, posRate:0};
-      db = d; save(); render(); toast('Yedek yüklendi');
-    } catch { toast('Geçersiz yedek dosyası'); }
+    } catch { toast('Geçersiz yedek dosyası'); return; }
+    if (!confirm(`Yedekte ${d.inc.length} gelir, ${d.exp.length} gider kaydı var.\nBuluttaki mevcut kayıtların YERİNE yüklensin mi?`)) return;
+    $('#main').innerHTML = empty('Yedek yükleniyor…');
+    try { await deleteAll(); await uploadAll(d); } catch {}
+    try { await loadAll(); } catch {}
+    render(); toast('Yedek yüklendi');
   };
   r.readAsText(file); e.target.value = '';
+});
+// Başka cihazdan girilen kayıtlar: sekmeye dönüldüğünde buluttan tazele
+let lastSync = Date.now();
+document.addEventListener('visibilitychange', async () => {
+  if (document.hidden || !user || Date.now() - lastSync < 10000) return;
+  lastSync = Date.now();
+  const before = JSON.stringify(db);
+  try { await loadAll(); } catch { return; }
+  // form doldurulurken yeniden çizme (yazılan kaybolmasın); bir sonraki işlemde zaten güncellenir
+  if (JSON.stringify(db) !== before && !document.activeElement?.closest('form')) render();
 });
 $('#perSel').addEventListener('change', e => {
   per.key = e.target.value;
@@ -711,28 +814,43 @@ function render() {
   $('#perWrap').style.visibility = view === 'ayar' ? 'hidden' : '';
   $('#main').innerHTML = R[view]();
 }
-var tt;  // var: save() açılışta toast çağırabilir, bu satırdan önce erişilebilmeli
-function toast(t) { const el = $('#toast'); el.textContent = t; el.classList.add('show'); clearTimeout(tt); tt = setTimeout(() => el.classList.remove('show'), 2400); }
+let tt;
+function toast(t) { const el = $('#toast'); el.textContent = t; el.classList.add('show'); clearTimeout(tt); tt = setTimeout(() => el.classList.remove('show'), 2800); }
 function setTheme(t) { document.documentElement.dataset.theme = t; try { localStorage.setItem('kasaTheme', t); } catch {} }
-function doLogin(e) {
+async function doLogin(e) {
   e.preventDefault();
-  if ($('#pw').value === PASS) {
-    try { sessionStorage.setItem('kasaAuth', '1'); } catch {}
-    showApp();
-  } else {
-    $('#pwErr').textContent = 'Şifre hatalı'; $('#pw').value = ''; $('#pw').focus();
+  const btn = $('#loginBtn');
+  if (!sb) { $('#pwErr').textContent = 'Sunucuya bağlanılamadı. İnternet bağlantınızı kontrol edin.'; return; }
+  btn.disabled = true; $('#pwErr').textContent = '';
+  const {data, error} = await sb.auth.signInWithPassword({email:LOGIN_EMAIL, password:$('#pw').value});
+  btn.disabled = false;
+  if (error) {
+    $('#pwErr').textContent = /invalid/i.test(error.message) ? 'Şifre hatalı' : /fetch|network/i.test(error.message) ? 'İnternet bağlantısı yok' : 'Giriş yapılamadı: ' + error.message;
+    $('#pw').value = ''; $('#pw').focus();
+    return;
   }
-  return false;
+  start(data.session);
 }
-function showApp() { $('#login').hidden = true; $('#app').hidden = false; render(); }
+async function start(session) {
+  user = session.user;
+  $('#login').hidden = true; $('#app').hidden = false;
+  render();
+  $('#main').innerHTML = empty('Kayıtlar yükleniyor…');
+  try { await loadAll(); await firstSetup(); }
+  catch { $('#main').innerHTML = `<div class="card">${empty('Kayıtlar yüklenemedi. İnternet bağlantınızı kontrol edip sayfayı yenileyin.')}</div>`; return; }
+  lastSync = Date.now();
+  render();
+}
 
-(function init() {
+(async function init() {
   let t = null; try { t = localStorage.getItem('kasaTheme'); } catch {}
   setTheme(t || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'));
   document.querySelector('[data-act=theme]').innerHTML = I(IC.theme);
   document.querySelector('[data-act=logout]').innerHTML = I(IC.out);
-  let ok = false; try { ok = sessionStorage.getItem('kasaAuth') === '1'; } catch {}
-  if (ok) showApp(); else $('#pw').focus();
+  if (!sb) { $('#pwErr').textContent = 'Sunucuya bağlanılamadı. İnternet bağlantınızı kontrol edip sayfayı yenileyin.'; return; }
+  const {data:{session}} = await sb.auth.getSession();
+  if (session) start(session);
+  else $('#pw').focus();
 })();
 </script>
 </body>
