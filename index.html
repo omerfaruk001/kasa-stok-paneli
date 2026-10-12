@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Kasa & Stok Paneli</title>
+<title>Gelir & Gider Paneli</title>
 <style>
 :root{--bg:#f4f5f7;--surface:#fff;--surface2:#f6f7f9;--border:#e4e7ec;--text:#111827;--muted:#6b7280;--primary:#4f46e5;--primary-soft:#eef2ff;--green:#059669;--green-soft:#ecfdf5;--red:#dc2626;--red-soft:#fef2f2;--amber:#b45309;--amber-soft:#fffbeb;--blue:#2563eb;--blue-soft:#eff6ff;--radius:12px;--shadow:0 1px 2px rgba(16,24,40,.05),0 1px 3px rgba(16,24,40,.07)}
 :root[data-theme=dark]{--bg:#0d1117;--surface:#161b22;--surface2:#1d232c;--border:#2a313c;--text:#e6edf3;--muted:#8b949e;--primary:#6366f1;--primary-soft:#23214d;--green:#34d399;--green-soft:#0b2a20;--red:#f87171;--red-soft:#2d1417;--amber:#fbbf24;--amber-soft:#2b2108;--blue:#60a5fa;--blue-soft:#132339;--shadow:none}
@@ -136,7 +136,7 @@ tfoot td{font-weight:650;border-top:1px solid var(--border);border-bottom:0;back
 <div id="login" class="login">
   <form class="login-card" onsubmit="return doLogin(event)">
     <div class="logo">₺</div>
-    <h1>Kasa & Stok Paneli</h1>
+    <h1>Gelir & Gider Paneli</h1>
     <p class="muted">Yönetici girişi</p>
     <input id="pw" type="password" inputmode="numeric" placeholder="••••••" autocomplete="current-password" aria-label="Şifre">
     <div id="pwErr" class="err"></div>
@@ -181,7 +181,7 @@ tfoot td{font-weight:650;border-top:1px solid var(--border);border-bottom:0;back
 
 <script>
 /* ============================================================
-   Kasa & Stok Paneli — tek dosya, çevrimdışı çalışır.
+   Gelir & Gider Paneli — tek dosya, çevrimdışı çalışır.
    Veriler bu tarayıcının localStorage alanında tutulur.
    Not: Şifre kontrolü tarayıcı tarafındadır; dosyaya erişen biri
    kodu okuyabilir. Düzenli olarak Ayarlar > Yedek Al yapın.
@@ -190,7 +190,8 @@ const PASS = '001002';
 const KEY = 'kasaStokPaneli_v1';
 const INC_M = {nakit:'Nakit', pos:'POS (Kart)', havale:'Havale / EFT'};
 const EXP_M = {nakit:'Nakit', kart:'Kart', havale:'Havale / EFT'};
-const TYPES = {stok:'Stok Malzemesi', sabit:'Sabit Gider', diger:'Diğer Gider'};
+// 'stok' anahtarı eski kayıtlarla uyum için korunuyor; arayüzde "Malzeme" olarak görünür
+const TYPES = {stok:'Malzeme', sabit:'Sabit Gider', diger:'Diğer Gider'};
 const AYLAR = ['Oca','Şub','Mar','Nis','May','Haz','Tem','Ağu','Eyl','Eki','Kas','Ara'];
 const AYLAR_UZUN = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'];
 
@@ -237,20 +238,19 @@ const IC = {
 
 /* ---------- veri ---------- */
 function seed() {
-  const stok = [['Kola / Su / Meyve Suyu','adet',24],['Sucuk','kg',2],['Kaşar','kg',2],['Et','kg',3],['Tavuk','kg',3],['Margarin','kg',2],['Salam','kg',1],['Patates','kg',10],['Ketçap / Mayonez','adet',4],['Sebze','kg',5]];
+  const malzeme = ['Kola / Su / Meyve Suyu','Sucuk','Kaşar','Et','Tavuk','Margarin','Salam','Patates','Ketçap / Mayonez','Sebze'];
   const sabit = ['Kira','Elektrik','Doğalgaz','Su Faturası','Personel Maaşı','İnternet / Telefon'];
   const diger = ['Ekmek','Ambalaj / Sarf Malzeme','Temizlik','Bakım / Onarım','Diğer'];
   return {
-    v:1,
+    v:2,
     settings:{name:'İşletmem', posRate:0},
     cats:[
-      ...stok.map(([n, u, m]) => ({id:uid(), name:n, type:'stok', unit:u, min:m})),
+      ...malzeme.map(n => ({id:uid(), name:n, type:'stok'})),
       ...sabit.map(n => ({id:uid(), name:n, type:'sabit'})),
       ...diger.map(n => ({id:uid(), name:n, type:'diger'}))
     ],
     inc:[],  // {id,ts,date,method,amount,note}
-    exp:[],  // {id,ts,date,catId,qty,amount,method,note}
-    mov:[]   // {id,ts,date,catId,type:'in'|'out'|'adj',qty,note,ref}
+    exp:[]   // {id,ts,date,catId,amount,method,note}
   };
 }
 function load() { try { const d = JSON.parse(localStorage.getItem(KEY)); return d && d.cats ? d : null; } catch { return null; } }
@@ -258,13 +258,7 @@ function save() { try { localStorage.setItem(KEY, JSON.stringify(db)); } catch (
 let db = load() || seed();
 if (!load()) save();
 
-const catById = id => db.cats.find(c => c.id === id) || {id, name:'(silinmiş kategori)', type:'diger', unit:''};
-const stockOf = cid => sum(db.mov.filter(m => m.catId === cid), m => m.type === 'out' ? -m.qty : m.qty);
-function avgCost(cid) {
-  const e = db.exp.filter(x => x.catId === cid && x.qty > 0);
-  const q = sum(e, x => x.qty);
-  return q ? sum(e, x => x.amount) / q : 0;
-}
+const catById = id => db.cats.find(c => c.id === id) || {id, name:'(silinmiş kategori)', type:'diger'};
 
 /* ---------- dönem ---------- */
 const per = {key:'month', from:'', to:''};
@@ -277,7 +271,7 @@ function range() {
     case 'lastmonth': return [ymd(new Date(Y, M - 1, 1)), ymd(new Date(Y, M, 0))];
     case 'year': return [Y + '-01-01', Y + '-12-31'];
     case 'all': {
-      const ds = [...db.inc, ...db.exp, ...db.mov].map(x => x.date).sort();
+      const ds = [...db.inc, ...db.exp].map(x => x.date).sort();
       return ds.length ? [ds[0], ds[ds.length - 1] > t ? ds[ds.length - 1] : t] : [t, t];
     }
     case 'custom': { const a = per.from || t, b = per.to || t; return a <= b ? [a, b] : [b, a]; }
@@ -321,6 +315,11 @@ const methodBars = s => barsHTML([
 ]);
 const catBars = (s, lim) => barsHTML(Object.entries(s.byCat).sort((a, b) => b[1] - a[1]).slice(0, lim)
   .map(([id, v]) => ({l:catById(id).name, v, c:'var(--red)'})));
+const typeBars = s => barsHTML([
+  {l:'Malzeme alımları', v:s.byType.stok, c:'var(--amber)'},
+  {l:'Sabit giderler', v:s.byType.sabit, c:'var(--primary)'},
+  {l:'Diğer giderler', v:s.byType.diger, c:'var(--blue)'}
+]);
 
 function buckets(a, b) {
   const s = parseD(a), e = parseD(b), days = Math.round((e - s) / 864e5) + 1, out = [];
@@ -371,21 +370,20 @@ function catOptions(sel, filterAll) {
 const methodOpts = (M, sel) => Object.entries(M).map(([k, v]) => `<option value="${k}" ${k === sel ? 'selected' : ''}>${v}</option>`).join('');
 
 /* ---------- görünümler ---------- */
-const VIEWS = {panel:['Panel', IC.dash], gelir:['Gelirler', IC.up], gider:['Giderler', IC.down], stok:['Stok', IC.box], rapor:['Raporlar', IC.chart], ayar:['Ayarlar', IC.set]};
+const VIEWS = {panel:['Panel', IC.dash], gelir:['Gelirler', IC.up], gider:['Giderler', IC.down], rapor:['Raporlar', IC.chart], ayar:['Ayarlar', IC.set]};
 let view = 'panel';
 const mem = {};   // formlarda son seçimleri hatırlar
-const R = {}, AFTER = {};
+const R = {};
 
 R.panel = () => {
   const [a, b] = range(), s = stats(a, b);
-  const crit = db.cats.filter(c => c.type === 'stok').map(c => ({c, st:stockOf(c.id)})).filter(x => x.st <= (x.c.min || 0));
   const recent = [...s.inc.map(x => ({...x, k:'inc'})), ...s.exp.map(x => ({...x, k:'exp'}))]
     .sort((x, y) => y.date.localeCompare(x.date) || y.ts - x.ts).slice(0, 8);
   return `
   <div class="chips no-print">
     <button class="btn primary" data-act="nav" data-v="gelir">${I(IC.plus, 16)} Gelir Gir</button>
     <button class="btn" data-act="nav" data-v="gider">${I(IC.plus, 16)} Gider Gir</button>
-    <button class="btn" data-act="nav" data-v="stok">${I(IC.box, 16)} Stok Hareketi</button>
+    <button class="btn" data-act="nav" data-v="rapor">${I(IC.chart, 16)} Raporlar</button>
   </div>
   <div class="grid g4">
     ${kpi('Toplam Gelir', money(s.gelir), s.inc.length + ' kayıt', '', 'k-g')}
@@ -399,9 +397,7 @@ R.panel = () => {
     <div class="card"><h3>En Büyük Giderler <small>ilk 8 kalem</small></h3>${catBars(s, 8)}</div>
   </div>
   <div class="grid g2">
-    <div class="card"><h3>Kritik Stok <span class="badge ${crit.length ? 'b-red' : 'b-ok'}">${crit.length ? crit.length + ' ürün' : 'Sorun yok'}</span></h3>
-      ${crit.length ? `<div class="rows">${crit.map(x => `<div><span>${esc(x.c.name)}<div class="t">Minimum: ${num(x.c.min)} ${esc(x.c.unit)}</div></span><span class="badge ${x.st <= 0 ? 'b-red' : 'b-amber'}">${num(x.st)} ${esc(x.c.unit)}</span></div>`).join('')}</div>` : empty('Tüm ürünler minimum seviyenin üzerinde')}
-    </div>
+    <div class="card"><h3>Gider Grupları</h3>${typeBars(s)}</div>
     <div class="card"><h3>Son İşlemler</h3>
       ${recent.length ? `<div class="rows">${recent.map(x => x.k === 'inc'
         ? `<div><span>${INC_M[x.method]} tahsilat<div class="t">${fmtD(x.date)}${x.note ? ' · ' + esc(x.note) : ''}</div></span><b class="pos">+${money(x.amount)}</b></div>`
@@ -445,11 +441,10 @@ R.gider = () => {
   const list = s.exp.filter(x => !f || x.catId === f).sort((x, y) => y.date.localeCompare(x.date) || y.ts - x.ts);
   const tot = sum(list, x => x.amount);
   return `
-  <div class="card no-print"><h3>Gider Girişi <small>Stok malzemelerinde miktar girerseniz stok otomatik artar</small></h3>
+  <div class="card no-print"><h3>Gider Girişi <small>Listede olmayan kalemleri Ayarlar’dan ekleyebilirsiniz</small></h3>
     <form class="form" onsubmit="return addExp(event)">
       ${fld('Tarih', `<input type="date" name="date" value="${mem.expDate || today()}" required>`)}
-      ${fld('Gider Kalemi', `<select name="cat" id="expCat" onchange="expCatChange()" required>${catOptions(mem.expCat)}</select>`)}
-      ${fld('Miktar <span id="expUnit"></span>', `<input name="qty" inputmode="decimal" placeholder="0" autocomplete="off">`, 'id="expQtyWrap"')}
+      ${fld('Gider Kalemi', `<select name="cat" required>${catOptions(mem.expCat)}</select>`)}
       ${fld('Tutar (₺)', `<input name="amount" inputmode="decimal" placeholder="0,00" required autocomplete="off">`)}
       ${fld('Ödeme Şekli', `<select name="method">${methodOpts(EXP_M, mem.expMethod || 'nakit')}</select>`)}
       ${fld('Açıklama / Tedarikçi', `<input name="note" placeholder="İsteğe bağlı" maxlength="120">`)}
@@ -457,7 +452,7 @@ R.gider = () => {
     </form>
   </div>
   <div class="grid g4">
-    ${kpi('Stok Malzemeleri', money(s.byType.stok), pct(s.byType.stok, s.gider), '', 'k-a')}
+    ${kpi('Malzeme Alımları', money(s.byType.stok), pct(s.byType.stok, s.gider), '', 'k-a')}
     ${kpi('Sabit Giderler', money(s.byType.sabit), pct(s.byType.sabit, s.gider) + ' · kira, elektrik…', '', 'k-p')}
     ${kpi('Diğer Giderler', money(s.byType.diger), pct(s.byType.diger, s.gider), '', 'k-b')}
     ${kpi('Toplam Gider', money(s.gider), perLabel(), 'neg', 'k-r')}
@@ -465,59 +460,10 @@ R.gider = () => {
   <div class="card"><h3>Gider Kayıtları <small>${list.length} kayıt · ${perLabel()}</small>
       <select class="no-print" style="width:auto;margin-left:auto" onchange="mem.expFilter=this.value;render()">${catOptions(f, true)}</select></h3>
     ${list.length ? `<div class="tbl"><table>
-      <thead><tr><th>Tarih</th><th>Kalem</th><th>Açıklama</th><th class="r">Miktar</th><th>Ödeme</th><th class="r">Tutar</th><th class="no-print"></th></tr></thead>
-      <tbody>${list.map(x => { const c = catById(x.catId); return `<tr><td>${fmtD(x.date)}</td><td>${esc(c.name)}</td><td class="wrap">${esc(x.note)}</td><td class="r">${x.qty ? num(x.qty) + ' ' + esc(c.unit || '') : '<span class="muted">—</span>'}</td><td><span class="badge b-${x.method}">${EXP_M[x.method]}</span></td><td class="r">${money(x.amount)}</td><td class="r no-print">${delBtn('del-exp', x.id)}</td></tr>`; }).join('')}</tbody>
-      <tfoot><tr><td colspan="5">Toplam</td><td class="r">${money(tot)}</td><td class="no-print"></td></tr></tfoot>
+      <thead><tr><th>Tarih</th><th>Kalem</th><th>Açıklama</th><th>Ödeme</th><th class="r">Tutar</th><th class="no-print"></th></tr></thead>
+      <tbody>${list.map(x => { const c = catById(x.catId); return `<tr><td>${fmtD(x.date)}</td><td>${esc(c.name)}</td><td class="wrap">${esc(x.note)}</td><td><span class="badge b-${x.method}">${EXP_M[x.method]}</span></td><td class="r">${money(x.amount)}</td><td class="r no-print">${delBtn('del-exp', x.id)}</td></tr>`; }).join('')}</tbody>
+      <tfoot><tr><td colspan="4">Toplam</td><td class="r">${money(tot)}</td><td class="no-print"></td></tr></tfoot>
     </table></div>` : empty('Bu dönemde gider kaydı yok')}
-  </div>`;
-};
-AFTER.gider = () => expCatChange();
-
-function stockRows(a, b) {
-  return db.cats.filter(c => c.type === 'stok').map(c => {
-    const mv = db.mov.filter(m => m.catId === c.id && inR(m.date, a, b));
-    const st = stockOf(c.id), avg = avgCost(c.id);
-    const outQ = sum(mv.filter(m => m.type === 'out'), m => m.qty);
-    return {c, st, avg, val:Math.max(st, 0) * avg, inQ:sum(mv.filter(m => m.type === 'in'), m => m.qty), outQ, outCost:outQ * avg};
-  });
-}
-R.stok = () => {
-  const [a, b] = range(), rows = stockRows(a, b);
-  const crit = rows.filter(r => r.st <= (r.c.min || 0)).length;
-  const moves = db.mov.filter(m => inR(m.date, a, b)).sort((x, y) => y.date.localeCompare(x.date) || y.ts - x.ts);
-  const tl = {in:'Giriş', out:'Çıkış / Kullanım', adj:'Sayım Düzeltme'};
-  return `
-  <div class="card no-print"><h3>Stok Hareketi <small>Satın alımları “Giderler”den girin; buradan kullanım/çıkış ve sayım yapın</small></h3>
-    <form class="form" onsubmit="return addMov(event)">
-      ${fld('Ürün', `<select name="cat" required>${db.cats.filter(c => c.type === 'stok').map(c => `<option value="${c.id}" ${c.id === mem.movCat ? 'selected' : ''}>${esc(c.name)} (${num(stockOf(c.id))} ${esc(c.unit)})</option>`).join('')}</select>`)}
-      ${fld('İşlem', `<select name="type">
-          <option value="out" ${mem.movType === 'out' ? 'selected' : ''}>Çıkış / Kullanım</option>
-          <option value="in" ${mem.movType === 'in' ? 'selected' : ''}>Giriş (faturasız / iade)</option>
-          <option value="adj" ${mem.movType === 'adj' ? 'selected' : ''}>Sayım — mevcut miktarı yaz</option></select>`)}
-      ${fld('Miktar', `<input name="qty" inputmode="decimal" placeholder="0" required autocomplete="off">`)}
-      ${fld('Tarih', `<input type="date" name="date" value="${mem.movDate || today()}" required>`)}
-      ${fld('Not', `<input name="note" placeholder="İsteğe bağlı" maxlength="120">`)}
-      <button class="btn primary">Kaydet</button>
-    </form>
-  </div>
-  <div class="grid g4">
-    ${kpi('Stok Değeri', money(sum(rows, r => r.val)), 'ortalama alış fiyatı ile', '', 'k-p')}
-    ${kpi('Ürün Sayısı', rows.length, 'takip edilen malzeme', '', 'k-b')}
-    ${kpi('Kritik Ürün', crit, 'minimumun altında', crit ? 'neg' : 'pos', crit ? 'k-r' : 'k-g')}
-    ${kpi('Dönem Tüketimi', money(sum(rows, r => r.outCost)), 'tahmini maliyet · ' + perLabel(), '', 'k-a')}
-  </div>
-  <div class="card"><h3>Mevcut Stok</h3>
-    ${rows.length ? `<div class="tbl"><table>
-      <thead><tr><th>Ürün</th><th class="r">Mevcut</th><th class="r">Minimum</th><th class="r">Ort. Alış</th><th class="r">Stok Değeri</th><th class="r">Dönem Giriş</th><th class="r">Dönem Çıkış</th><th>Durum</th></tr></thead>
-      <tbody>${rows.map(r => `<tr><td>${esc(r.c.name)}</td><td class="r"><b>${num(r.st)}</b> ${esc(r.c.unit)}</td><td class="r">${num(r.c.min)} ${esc(r.c.unit)}</td><td class="r">${r.avg ? money(r.avg) + '/' + esc(r.c.unit) : '—'}</td><td class="r">${money(r.val)}</td><td class="r">${num(r.inQ)}</td><td class="r">${num(r.outQ)}</td>
-        <td>${r.st <= 0 ? '<span class="badge b-red">Tükendi</span>' : r.st <= (r.c.min || 0) ? '<span class="badge b-amber">Kritik</span>' : '<span class="badge b-ok">Yeterli</span>'}</td></tr>`).join('')}</tbody>
-    </table></div>` : empty('Stok kategorisi yok — Ayarlar’dan ekleyin')}
-  </div>
-  <div class="card"><h3>Stok Hareketleri <small>${moves.length} hareket · ${perLabel()}</small></h3>
-    ${moves.length ? `<div class="tbl"><table>
-      <thead><tr><th>Tarih</th><th>Ürün</th><th>İşlem</th><th class="r">Miktar</th><th>Not</th><th class="no-print"></th></tr></thead>
-      <tbody>${moves.map(m => { const c = catById(m.catId), sign = m.type === 'out' ? -m.qty : m.qty; return `<tr><td>${fmtD(m.date)}</td><td>${esc(c.name)}</td><td><span class="badge ${m.type === 'out' ? 'b-red' : m.type === 'in' ? 'b-ok' : 'b-amber'}">${tl[m.type]}</span>${m.ref ? ' <span class="badge b-gray">alış faturası</span>' : ''}</td><td class="r ${sign < 0 ? 'neg' : 'pos'}">${sign > 0 ? '+' : ''}${num(sign)} ${esc(c.unit)}</td><td class="wrap">${esc(m.note)}</td><td class="r no-print">${m.ref ? '' : delBtn('del-mov', m.id)}</td></tr>`; }).join('')}</tbody>
-    </table></div>` : empty('Bu dönemde stok hareketi yok')}
   </div>`;
 };
 
@@ -526,7 +472,6 @@ R.rapor = () => {
   const days = Math.round((parseD(b) - parseD(a)) / 864e5) + 1;
   const actDays = new Set(s.inc.map(x => x.date)).size;
   const cats = Object.entries(s.byCat).sort((x, y) => y[1] - x[1]);
-  const srows = stockRows(a, b).filter(r => r.inQ || r.outQ);
   // son 12 ay
   const n = new Date(), months = [];
   for (let i = 11; i >= 0; i--) {
@@ -553,7 +498,7 @@ R.rapor = () => {
         <tr><td>POS (kart) tahsilat</td><td class="r">${money(s.byM.pos)}</td></tr>
         <tr><td>Havale / EFT</td><td class="r">${money(s.byM.havale)}</td></tr>
         <tr class="hl"><td>Brüt Gelir</td><td class="r pos">${money(s.gelir)}</td></tr>
-        <tr><td>Stok malzeme alımları</td><td class="r">${money(s.byType.stok)}</td></tr>
+        <tr><td>Malzeme alımları</td><td class="r">${money(s.byType.stok)}</td></tr>
         <tr><td>Sabit giderler</td><td class="r">${money(s.byType.sabit)}</td></tr>
         <tr><td>Diğer giderler</td><td class="r">${money(s.byType.diger)}</td></tr>
         ${rate ? `<tr><td>POS komisyonu (%${num(rate)})</td><td class="r">${money(s.kom)}</td></tr>` : ''}
@@ -567,22 +512,15 @@ R.rapor = () => {
     </div>
     <div class="grid" style="align-content:start">
       <div class="card"><h3>Tahsilat Dağılımı</h3>${methodBars(s)}</div>
-      <div class="card"><h3>Gider Grupları</h3>${barsHTML([{l:'Stok malzemeleri', v:s.byType.stok, c:'var(--amber)'}, {l:'Sabit giderler', v:s.byType.sabit, c:'var(--primary)'}, {l:'Diğer giderler', v:s.byType.diger, c:'var(--blue)'}])}</div>
+      <div class="card"><h3>Gider Grupları</h3>${typeBars(s)}</div>
     </div>
   </div>
   <div class="card"><h3>Gider Kalemleri Detayı</h3>
     ${cats.length ? `<div class="tbl"><table>
-      <thead><tr><th>Kalem</th><th>Grup</th><th class="r">Kayıt</th><th class="r">Alınan Miktar</th><th class="r">Tutar</th><th class="r">Pay</th></tr></thead>
-      <tbody>${cats.map(([id, v]) => { const c = catById(id), e = s.exp.filter(x => x.catId === id), q = sum(e, x => x.qty || 0); return `<tr><td>${esc(c.name)}</td><td class="muted">${TYPES[c.type]}</td><td class="r">${e.length}</td><td class="r">${q ? num(q) + ' ' + esc(c.unit) : '—'}</td><td class="r">${money(v)}</td><td class="r">${pct(v, s.gider)}</td></tr>`; }).join('')}</tbody>
-      <tfoot><tr><td colspan="4">Toplam</td><td class="r">${money(s.gider)}</td><td class="r">%100</td></tr></tfoot>
+      <thead><tr><th>Kalem</th><th>Grup</th><th class="r">Kayıt</th><th class="r">Tutar</th><th class="r">Pay</th></tr></thead>
+      <tbody>${cats.map(([id, v]) => { const c = catById(id), n = s.exp.filter(x => x.catId === id).length; return `<tr><td>${esc(c.name)}</td><td class="muted">${TYPES[c.type]}</td><td class="r">${n}</td><td class="r">${money(v)}</td><td class="r">${pct(v, s.gider)}</td></tr>`; }).join('')}</tbody>
+      <tfoot><tr><td colspan="3">Toplam</td><td class="r">${money(s.gider)}</td><td class="r">%100</td></tr></tfoot>
     </table></div>` : empty('Bu dönemde gider yok')}
-  </div>
-  <div class="card"><h3>Stok Tüketimi <small>alınan / kullanılan miktar ve tahmini kullanım maliyeti</small></h3>
-    ${srows.length ? `<div class="tbl"><table>
-      <thead><tr><th>Ürün</th><th class="r">Giren</th><th class="r">Kullanılan</th><th class="r">Ort. Alış</th><th class="r">Kullanım Maliyeti</th><th class="r">Kalan Stok</th></tr></thead>
-      <tbody>${srows.map(r => `<tr><td>${esc(r.c.name)}</td><td class="r">${num(r.inQ)} ${esc(r.c.unit)}</td><td class="r">${num(r.outQ)} ${esc(r.c.unit)}</td><td class="r">${r.avg ? money(r.avg) : '—'}</td><td class="r">${money(r.outCost)}</td><td class="r">${num(r.st)} ${esc(r.c.unit)}</td></tr>`).join('')}</tbody>
-      <tfoot><tr><td colspan="4">Toplam kullanım maliyeti</td><td class="r">${money(sum(srows, r => r.outCost))}</td><td></td></tr></tfoot>
-    </table></div>` : empty('Bu dönemde stok hareketi yok')}
   </div>
   <div class="card"><h3>Aylık Karşılaştırma <small>son 12 ay</small></h3>
     <div class="tbl"><table>
@@ -617,24 +555,20 @@ R.ayar = () => `
         <button class="btn danger" data-act="reset">${I(IC.trash, 16)} Tüm Verileri Sil</button>
       </div>
       <p class="hint">Haftada en az bir kez yedek alın. Tarayıcı geçmişi/çerezleri temizlenirse veriler silinebilir. Yedek dosyasını başka bilgisayarda “Yedekten Yükle” ile açabilirsiniz.</p>
-      <p class="hint">Kayıt sayısı: ${db.inc.length} gelir · ${db.exp.length} gider · ${db.mov.length} stok hareketi</p>
+      <p class="hint">Kayıt sayısı: ${db.inc.length} gelir · ${db.exp.length} gider</p>
     </div>
   </div>
-  <div class="card"><h3>Gider Kalemleri ve Stok Ürünleri</h3>
+  <div class="card"><h3>Gider Kalemleri</h3>
     <form class="form no-print" onsubmit="return addCat(event)" style="margin-bottom:14px">
       ${fld('Yeni kalem adı', `<input name="name" required maxlength="50" placeholder="örn. Lavaş">`)}
-      ${fld('Grup', `<select name="type" onchange="this.form.unit.disabled=this.form.min.disabled=this.value!=='stok'">${Object.entries(TYPES).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select>`)}
-      ${fld('Birim (stok için)', `<input name="unit" placeholder="kg, adet, lt…" maxlength="10" value="kg">`)}
-      ${fld('Minimum stok', `<input name="min" inputmode="decimal" placeholder="0">`)}
+      ${fld('Grup', `<select name="type">${Object.entries(TYPES).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select>`)}
       <button class="btn primary">${I(IC.plus, 16)} Ekle</button>
     </form>
     <div class="tbl"><table>
-      <thead><tr><th>Ad</th><th>Grup</th><th>Birim</th><th>Min. Stok</th><th class="r">Kayıt</th><th></th></tr></thead>
-      <tbody>${db.cats.map(c => { const used = db.exp.filter(x => x.catId === c.id).length + db.mov.filter(m => m.catId === c.id).length; return `<tr>
+      <thead><tr><th>Ad</th><th>Grup</th><th class="r">Kayıt</th><th></th></tr></thead>
+      <tbody>${db.cats.map(c => { const used = db.exp.filter(x => x.catId === c.id).length; return `<tr>
         <td><input value="${esc(c.name)}" data-cf="name" data-id="${c.id}" style="min-width:160px"></td>
         <td class="muted">${TYPES[c.type]}</td>
-        <td>${c.type === 'stok' ? `<input value="${esc(c.unit)}" data-cf="unit" data-id="${c.id}" style="width:80px">` : '<span class="muted">—</span>'}</td>
-        <td>${c.type === 'stok' ? `<input value="${num(c.min)}" inputmode="decimal" data-cf="min" data-id="${c.id}" style="width:90px">` : '<span class="muted">—</span>'}</td>
         <td class="r">${used}</td>
         <td class="r">${used ? '' : delBtn('del-cat', c.id)}</td></tr>`; }).join('')}</tbody>
     </table></div>
@@ -654,41 +588,15 @@ function addInc(e) {
   mem.incDate = date; save(); render(); toast(n + ' gelir kaydı eklendi');
   return false;
 }
-function expCatChange() {
-  const sel = $('#expCat'); if (!sel) return;
-  const c = catById(sel.value);
-  $('#expQtyWrap').style.display = c.type === 'stok' ? '' : 'none';
-  $('#expUnit').textContent = c.unit ? '(' + c.unit + ')' : '';
-}
 function addExp(e) {
   e.preventDefault();
   const f = new FormData(e.target), c = catById(f.get('cat'));
-  const amount = toNum(f.get('amount')), qty = c.type === 'stok' ? toNum(f.get('qty')) : 0;
+  const amount = toNum(f.get('amount'));
   if (amount <= 0) { toast('Geçerli bir tutar girin'); return false; }
-  const x = {id:uid(), ts:Date.now(), date:f.get('date'), catId:c.id, qty, amount, method:f.get('method'), note:f.get('note').trim()};
+  const x = {id:uid(), ts:Date.now(), date:f.get('date'), catId:c.id, amount, method:f.get('method'), note:f.get('note').trim()};
   db.exp.push(x);
-  if (qty > 0) db.mov.push({id:uid(), ts:Date.now(), date:x.date, catId:c.id, type:'in', qty, note:'Alış: ' + money(amount), ref:x.id});
   Object.assign(mem, {expDate:x.date, expCat:c.id, expMethod:x.method});
-  save(); render();
-  toast(qty > 0 ? `Gider kaydedildi, stok +${num(qty)} ${c.unit}` : 'Gider kaydedildi');
-  return false;
-}
-function addMov(e) {
-  e.preventDefault();
-  const f = new FormData(e.target), cid = f.get('cat'), type = f.get('type'), c = catById(cid);
-  let qty = toNum(f.get('qty'));
-  const cur = stockOf(cid);
-  if (type === 'adj') {
-    if (qty < 0) { toast('Geçerli bir miktar girin'); return false; }
-    qty = Math.round((qty - cur) * 1000) / 1000;
-    if (!qty) { toast('Stok zaten bu miktarda'); return false; }
-  } else {
-    if (qty <= 0) { toast('Geçerli bir miktar girin'); return false; }
-    if (type === 'out' && qty > cur && !confirm(`Mevcut stok ${num(cur)} ${c.unit}. Yine de ${num(qty)} ${c.unit} çıkış yapılsın mı?`)) return false;
-  }
-  db.mov.push({id:uid(), ts:Date.now(), date:f.get('date'), catId:cid, type, qty, note:f.get('note').trim()});
-  Object.assign(mem, {movCat:cid, movType:type, movDate:f.get('date')});
-  save(); render(); toast('Stok güncellendi: ' + c.name + ' → ' + num(stockOf(cid)) + ' ' + c.unit);
+  save(); render(); toast('Gider kaydedildi: ' + c.name);
   return false;
 }
 function saveSettings(e) {
@@ -705,7 +613,6 @@ function addCat(e) {
   if (!name) return false;
   if (db.cats.some(c => c.name.toLocaleLowerCase('tr') === name.toLocaleLowerCase('tr'))) { toast('Bu isimde kalem zaten var'); return false; }
   const c = {id:uid(), name, type};
-  if (type === 'stok') { c.unit = (f.get('unit') || 'adet').trim(); c.min = toNum(f.get('min')); }
   db.cats.push(c); save(); render(); toast('“' + name + '” eklendi');
   return false;
 }
@@ -719,13 +626,13 @@ function exportCSV() {
   const [a, b] = range(), s = stats(a, b);
   const q = v => '"' + String(v ?? '').replace(/"/g, '""') + '"';
   const n2 = v => String((Math.round(v * 100) / 100)).replace('.', ',');
-  const rows = [['Tarih', 'Tür', 'Kalem / Ödeme Şekli', 'Grup', 'Miktar', 'Birim', 'Ödeme', 'Tutar', 'Not']];
-  s.inc.forEach(x => rows.push([fmtD(x.date), 'Gelir', INC_M[x.method], '', '', '', INC_M[x.method], n2(x.amount), x.note]));
-  s.exp.forEach(x => { const c = catById(x.catId); rows.push([fmtD(x.date), 'Gider', c.name, TYPES[c.type], x.qty ? n2(x.qty) : '', c.unit || '', EXP_M[x.method], n2(-x.amount), x.note]); });
+  const rows = [['Tarih', 'Tür', 'Kalem / Ödeme Şekli', 'Grup', 'Ödeme', 'Tutar', 'Not']];
+  s.inc.forEach(x => rows.push([fmtD(x.date), 'Gelir', INC_M[x.method], '', INC_M[x.method], n2(x.amount), x.note]));
+  s.exp.forEach(x => { const c = catById(x.catId); rows.push([fmtD(x.date), 'Gider', c.name, TYPES[c.type], EXP_M[x.method], n2(-x.amount), x.note]); });
   rows.sort((x, y) => x[0] === 'Tarih' ? -1 : y[0] === 'Tarih' ? 1 : x[0].split('.').reverse().join().localeCompare(y[0].split('.').reverse().join()));
-  rows.push([], ['', 'Toplam Gelir', '', '', '', '', '', n2(s.gelir)], ['', 'Toplam Gider', '', '', '', '', '', n2(-s.gider)]);
-  if (s.kom) rows.push(['', 'POS Komisyonu', '', '', '', '', '', n2(-s.kom)]);
-  rows.push(['', 'Net Kâr', '', '', '', '', '', n2(s.kar)]);
+  rows.push([], ['', 'Toplam Gelir', '', '', '', n2(s.gelir)], ['', 'Toplam Gider', '', '', '', n2(-s.gider)]);
+  if (s.kom) rows.push(['', 'POS Komisyonu', '', '', '', n2(-s.kom)]);
+  rows.push(['', 'Net Kâr', '', '', '', n2(s.kar)]);
   download(`rapor_${a}_${b}.csv`, '﻿' + rows.map(r => r.map(q).join(';')).join('\r\n'), 'text/csv;charset=utf-8');
 }
 
@@ -736,8 +643,7 @@ document.addEventListener('click', e => {
   switch (el.dataset.act) {
     case 'nav': view = el.dataset.v; render(); window.scrollTo(0, 0); break;
     case 'del-inc': if (confirm('Bu gelir kaydı silinsin mi?')) { db.inc = db.inc.filter(x => x.id !== id); save(); render(); toast('Silindi'); } break;
-    case 'del-exp': if (confirm('Bu gider kaydı silinsin mi?\nMiktar girildiyse ilgili stok girişi de geri alınır.')) { db.exp = db.exp.filter(x => x.id !== id); db.mov = db.mov.filter(m => m.ref !== id); save(); render(); toast('Silindi'); } break;
-    case 'del-mov': if (confirm('Bu stok hareketi silinsin mi?')) { db.mov = db.mov.filter(m => m.id !== id); save(); render(); toast('Silindi'); } break;
+    case 'del-exp': if (confirm('Bu gider kaydı silinsin mi?')) { db.exp = db.exp.filter(x => x.id !== id); save(); render(); toast('Silindi'); } break;
     case 'del-cat': if (confirm('Bu kalem silinsin mi?')) { db.cats = db.cats.filter(c => c.id !== id); save(); render(); toast('Silindi'); } break;
     case 'theme': setTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark'); break;
     case 'logout': try { sessionStorage.removeItem('kasaAuth'); } catch {} location.reload(); break;
@@ -746,7 +652,7 @@ document.addEventListener('click', e => {
     case 'backup': download(`kasa-yedek_${today()}.json`, JSON.stringify(db, null, 1), 'application/json'); toast('Yedek indirildi'); break;
     case 'restore': $('#restoreFile').click(); break;
     case 'reset':
-      if (confirm('TÜM gelir, gider ve stok kayıtları silinecek. Önce yedek almanız önerilir. Devam edilsin mi?') && prompt('Onay için SİL yazın') === 'SİL') {
+      if (confirm('TÜM gelir ve gider kayıtları silinecek. Önce yedek almanız önerilir. Devam edilsin mi?') && prompt('Onay için SİL yazın') === 'SİL') {
         db = seed(); save(); render(); toast('Tüm veriler silindi');
       }
       break;
@@ -758,7 +664,7 @@ document.addEventListener('change', e => {
     const c = db.cats.find(x => x.id === el.dataset.id); if (!c) return;
     const f = el.dataset.cf, v = el.value.trim();
     if (f === 'name' && !v) { el.value = c.name; return; }
-    c[f] = f === 'min' ? toNum(v) : v;
+    c[f] = v;
     save(); toast('Güncellendi');
   }
 });
@@ -768,7 +674,8 @@ $('#restoreFile').addEventListener('change', e => {
   r.onload = () => {
     try {
       const d = JSON.parse(r.result);
-      if (!Array.isArray(d.cats) || !Array.isArray(d.inc) || !Array.isArray(d.exp) || !Array.isArray(d.mov)) throw 0;
+      if (!Array.isArray(d.cats) || !Array.isArray(d.inc) || !Array.isArray(d.exp)) throw 0;
+      delete d.mov;
       if (!confirm(`Yedekte ${d.inc.length} gelir, ${d.exp.length} gider kaydı var. Mevcut verilerin yerine yüklensin mi?`)) return;
       d.settings ||= {name:'İşletmem', posRate:0};
       db = d; save(); render(); toast('Yedek yüklendi');
@@ -795,7 +702,6 @@ function render() {
   document.title = VIEWS[view][0] + ' · ' + db.settings.name;
   $('#perWrap').style.visibility = view === 'ayar' ? 'hidden' : '';
   $('#main').innerHTML = R[view]();
-  AFTER[view] && AFTER[view]();
 }
 let tt;
 function toast(t) { const el = $('#toast'); el.textContent = t; el.classList.add('show'); clearTimeout(tt); tt = setTimeout(() => el.classList.remove('show'), 2400); }
