@@ -51,6 +51,8 @@ input:focus,select:focus{border-color:var(--primary);box-shadow:0 0 0 3px var(--
 .content{min-width:0}
 .top{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 24px;border-bottom:1px solid var(--border);background:var(--surface);position:sticky;top:0;z-index:5;flex-wrap:wrap}
 .top h2{margin:0;font-size:17px}
+.m-brand{display:none;align-items:center;gap:8px;font-weight:650;font-size:15px}
+.m-brand .logo.sm{width:26px;height:26px;font-size:13px;border-radius:7px}
 .top-ctrl{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 #perWrap{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 #perSel{width:auto}
@@ -114,6 +116,9 @@ tfoot td{font-weight:650;border-top:1px solid var(--border);border-bottom:0;back
   .app{grid-template-columns:1fr}
   .side{position:fixed;inset:auto 0 0 0;height:auto;padding:6px;border-right:0;border-top:1px solid var(--border);z-index:20}
   .brand{display:none}
+  .m-brand{display:flex}
+  .top h2{font-size:12.5px;font-weight:500;color:var(--muted)}
+  .top-title{display:flex;flex-direction:column;gap:2px}
   #nav{flex-direction:row;justify-content:space-around}
   .nav-item{flex-direction:column;gap:2px;font-size:11px;padding:6px 2px;flex:1;align-items:center}
   .g2{grid-template-columns:1fr}
@@ -152,7 +157,7 @@ tfoot td{font-weight:650;border-top:1px solid var(--border);border-bottom:0;back
   </aside>
   <div class="content">
     <header class="top">
-      <h2 id="viewTitle"></h2>
+      <div class="top-title"><div class="m-brand"><span class="logo sm">₺</span><span id="mBizName"></span></div><h2 id="viewTitle"></h2></div>
       <div class="top-ctrl">
         <div id="perWrap">
           <select id="perSel" aria-label="Dönem">
@@ -257,7 +262,8 @@ function seed() {
 function load() { try { const d = JSON.parse(localStorage.getItem(KEY)); return d && d.cats ? d : null; } catch { return null; } }
 function save() { try { localStorage.setItem(KEY, JSON.stringify(db)); } catch (e) { toast('Kaydedilemedi: tarayıcı depolaması dolu veya kapalı'); } }
 let db = load() || seed();
-if (['İşletmem', 'Tostçu Kurtalan'].includes(db.settings.name)) db.settings.name = DEFAULT_NAME;  // eski varsayılan addan geçiş
+// eski varsayılan adlardan geçiş — hemen kaydedilir ki eski ad geri gelmesin
+if (['İşletmem', 'Tostçu Kurtalan'].includes(db.settings.name)) { db.settings.name = DEFAULT_NAME; save(); }
 if (!load()) save();
 
 const catById = id => db.cats.find(c => c.id === id) || {id, name:'(silinmiş kategori)', type:'diger'};
@@ -700,12 +706,12 @@ $('#perSel').addEventListener('change', e => {
 function render() {
   $('#nav').innerHTML = Object.entries(VIEWS).map(([k, [t, ic]]) => `<button class="nav-item ${k === view ? 'on' : ''}" data-act="nav" data-v="${k}">${I(ic)}<span>${t}</span></button>`).join('');
   $('#viewTitle').textContent = VIEWS[view][0];
-  $('#bizName').textContent = db.settings.name;
+  $('#bizName').textContent = $('#mBizName').textContent = db.settings.name;
   document.title = VIEWS[view][0] + ' · ' + db.settings.name;
   $('#perWrap').style.visibility = view === 'ayar' ? 'hidden' : '';
   $('#main').innerHTML = R[view]();
 }
-let tt;
+var tt;  // var: save() açılışta toast çağırabilir, bu satırdan önce erişilebilmeli
 function toast(t) { const el = $('#toast'); el.textContent = t; el.classList.add('show'); clearTimeout(tt); tt = setTimeout(() => el.classList.remove('show'), 2400); }
 function setTheme(t) { document.documentElement.dataset.theme = t; try { localStorage.setItem('kasaTheme', t); } catch {} }
 function doLogin(e) {
