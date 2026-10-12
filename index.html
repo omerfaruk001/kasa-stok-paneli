@@ -1,0 +1,825 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Kasa & Stok Paneli</title>
+<style>
+:root{--bg:#f4f5f7;--surface:#fff;--surface2:#f6f7f9;--border:#e4e7ec;--text:#111827;--muted:#6b7280;--primary:#4f46e5;--primary-soft:#eef2ff;--green:#059669;--green-soft:#ecfdf5;--red:#dc2626;--red-soft:#fef2f2;--amber:#b45309;--amber-soft:#fffbeb;--blue:#2563eb;--blue-soft:#eff6ff;--radius:12px;--shadow:0 1px 2px rgba(16,24,40,.05),0 1px 3px rgba(16,24,40,.07)}
+:root[data-theme=dark]{--bg:#0d1117;--surface:#161b22;--surface2:#1d232c;--border:#2a313c;--text:#e6edf3;--muted:#8b949e;--primary:#6366f1;--primary-soft:#23214d;--green:#34d399;--green-soft:#0b2a20;--red:#f87171;--red-soft:#2d1417;--amber:#fbbf24;--amber-soft:#2b2108;--blue:#60a5fa;--blue-soft:#132339;--shadow:none}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--text);-webkit-font-smoothing:antialiased}
+button,input,select,textarea{font:inherit;color:inherit}
+[hidden]{display:none!important}
+.muted{color:var(--muted)}
+.pos{color:var(--green)}.neg{color:var(--red)}
+/* Giriş */
+.login{min-height:100vh;display:grid;place-items:center;padding:16px;background:radial-gradient(900px 500px at 20% -10%,var(--primary-soft),transparent),var(--bg)}
+.login-card{width:100%;max-width:340px;background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:28px;box-shadow:var(--shadow);display:grid;gap:12px;text-align:center}
+.login-card h1{font-size:20px;margin:4px 0 0}
+.login-card p{margin:0}
+.logo{width:48px;height:48px;border-radius:12px;background:var(--primary);color:#fff;display:grid;place-items:center;font-weight:700;font-size:22px;margin:0 auto}
+.logo.sm{width:30px;height:30px;font-size:15px;border-radius:8px;margin:0;flex:none}
+.err{color:var(--red);font-size:13px;min-height:18px}
+#pw{height:46px;text-align:center;font-size:20px;letter-spacing:.35em}
+/* Form */
+input,select,textarea{width:100%;height:38px;padding:0 10px;border:1px solid var(--border);background:var(--surface);border-radius:8px;outline:none}
+input:focus,select:focus{border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-soft)}
+.field label{display:block;font-size:12px;color:var(--muted);margin-bottom:4px;font-weight:500}
+.form{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;align-items:end}
+.btn{height:38px;padding:0 14px;border-radius:8px;border:1px solid var(--border);background:var(--surface);cursor:pointer;display:inline-flex;align-items:center;gap:6px;justify-content:center;font-weight:500;white-space:nowrap}
+.btn:hover{background:var(--surface2)}
+.btn.primary{background:var(--primary);border-color:var(--primary);color:#fff}
+.btn.primary:hover{filter:brightness(1.08)}
+.btn.danger{color:var(--red)}
+.btn.block{width:100%;height:44px}
+.icon-btn{width:34px;height:34px;border-radius:8px;border:1px solid var(--border);background:var(--surface);cursor:pointer;display:grid;place-items:center;color:var(--muted);flex:none}
+.icon-btn:hover{color:var(--text);background:var(--surface2)}
+.icon-btn.sm{width:28px;height:28px;border:0;background:none}
+.icon-btn.del:hover{color:var(--red);background:var(--red-soft)}
+/* Yerleşim */
+.app{display:grid;grid-template-columns:216px 1fr;min-height:100vh}
+.side{background:var(--surface);border-right:1px solid var(--border);padding:16px 12px;display:flex;flex-direction:column;gap:4px;position:sticky;top:0;height:100vh}
+.brand{display:flex;align-items:center;gap:10px;font-weight:650;padding:4px 6px 16px;overflow:hidden}
+.brand span:last-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#nav{display:flex;flex-direction:column;gap:2px}
+.nav-item{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:8px;border:0;background:none;cursor:pointer;color:var(--muted);text-align:left;font-weight:500}
+.nav-item:hover{background:var(--surface2);color:var(--text)}
+.nav-item.on{background:var(--primary-soft);color:var(--primary)}
+:root[data-theme=dark] .nav-item.on{color:#a5b4fc}
+.content{min-width:0}
+.top{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 24px;border-bottom:1px solid var(--border);background:var(--surface);position:sticky;top:0;z-index:5;flex-wrap:wrap}
+.top h2{margin:0;font-size:17px}
+.top-ctrl{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+#perWrap{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+#perSel{width:auto}
+#customRange{display:flex;gap:6px}
+#customRange input{width:138px}
+main{padding:20px 24px 40px;display:grid;gap:16px;max-width:1280px}
+.grid{display:grid;gap:16px}
+.g4{grid-template-columns:repeat(4,minmax(0,1fr))}
+.g2{grid-template-columns:repeat(2,minmax(0,1fr))}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px;box-shadow:var(--shadow);min-width:0}
+.card h3{margin:0 0 12px;font-size:14px;font-weight:600;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.card h3 small{font-weight:400;font-size:12px;color:var(--muted)}
+.kpi .l{color:var(--muted);font-size:12.5px;font-weight:500}
+.kpi .v{font-size:22px;font-weight:700;margin-top:4px;letter-spacing:-.01em;font-variant-numeric:tabular-nums}
+.kpi .s{font-size:12px;color:var(--muted);margin-top:2px}
+.kpi{border-top:3px solid var(--border)}
+.kpi.k-g{border-top-color:var(--green)}.kpi.k-r{border-top-color:var(--red)}.kpi.k-p{border-top-color:var(--primary)}.kpi.k-b{border-top-color:var(--blue)}.kpi.k-a{border-top-color:var(--amber)}
+/* Tablo */
+.tbl{overflow-x:auto;border:1px solid var(--border);border-radius:8px}
+table{width:100%;border-collapse:collapse}
+th,td{padding:8px 10px;border-bottom:1px solid var(--border);text-align:left;white-space:nowrap}
+th{font-size:12px;color:var(--muted);font-weight:500;background:var(--surface2)}
+td{font-variant-numeric:tabular-nums}
+.r{text-align:right}
+td.wrap{white-space:normal;min-width:140px}
+tbody tr:last-child td{border-bottom:0}
+tbody tr:hover td{background:var(--surface2)}
+tfoot td{font-weight:650;border-top:1px solid var(--border);border-bottom:0;background:var(--surface2)}
+.badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;font-weight:500;white-space:nowrap}
+.b-nakit,.b-ok{background:var(--green-soft);color:var(--green)}
+.b-pos,.b-kart{background:var(--blue-soft);color:var(--blue)}
+.b-havale{background:var(--primary-soft);color:var(--primary)}
+:root[data-theme=dark] .b-havale{color:#a5b4fc}
+.b-red{background:var(--red-soft);color:var(--red)}
+.b-amber{background:var(--amber-soft);color:var(--amber)}
+.b-gray{background:var(--surface2);color:var(--muted)}
+/* Çubuklar */
+.bars{display:grid;gap:12px}
+.bl{display:flex;justify-content:space-between;gap:8px;font-size:13px;margin-bottom:5px}
+.bl b{font-weight:600;font-variant-numeric:tabular-nums}
+.track{height:8px;background:var(--surface2);border-radius:99px;overflow:hidden}
+.fill{height:100%;border-radius:99px;background:var(--primary)}
+.chart-wrap{overflow-x:auto}
+.chart-wrap svg{display:block}
+.legend{display:flex;gap:14px;font-size:12px;font-weight:400;color:var(--muted)}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+.empty{color:var(--muted);text-align:center;padding:22px;font-size:13px}
+.rows>div{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border)}
+.rows>div:last-child{border-bottom:0}
+.rows .t{font-size:12px;color:var(--muted)}
+.chips{display:flex;gap:8px;flex-wrap:wrap}
+.hint{font-size:12px;color:var(--muted);margin:10px 0 0}
+.sum-tbl td:first-child{color:var(--muted)}
+.sum-tbl tr.hl td{font-weight:700;color:var(--text);font-size:15px}
+.sec-title{font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:600;margin:4px 0 -6px}
+#toast{position:fixed;bottom:24px;left:50%;transform:translate(-50%,16px);background:var(--text);color:var(--bg);padding:10px 16px;border-radius:8px;opacity:0;transition:.2s;pointer-events:none;z-index:50;font-weight:500;max-width:calc(100% - 32px)}
+#toast.show{opacity:1;transform:translate(-50%,0)}
+.print-head{display:none}
+@media(max-width:1050px){.g4{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:820px){
+  .app{grid-template-columns:1fr}
+  .side{position:fixed;inset:auto 0 0 0;height:auto;padding:6px;border-right:0;border-top:1px solid var(--border);z-index:20}
+  .brand{display:none}
+  #nav{flex-direction:row;justify-content:space-around}
+  .nav-item{flex-direction:column;gap:2px;font-size:11px;padding:6px 2px;flex:1;align-items:center}
+  .g2{grid-template-columns:1fr}
+  main{padding:16px 16px 90px}
+  .top{padding:10px 16px}
+}
+@media(max-width:480px){.kpi .v{font-size:18px}.card{padding:14px}#customRange input{width:126px}}
+@media print{
+  .side,.top,.no-print,form{display:none!important}
+  .app{display:block}main{padding:0;max-width:none}
+  body{background:#fff;color:#000}
+  .card{box-shadow:none;break-inside:avoid;border-color:#ccc}
+  .print-head{display:block}
+}
+</style>
+</head>
+<body>
+
+<!-- GİRİŞ -->
+<div id="login" class="login">
+  <form class="login-card" onsubmit="return doLogin(event)">
+    <div class="logo">₺</div>
+    <h1>Kasa & Stok Paneli</h1>
+    <p class="muted">Yönetici girişi</p>
+    <input id="pw" type="password" inputmode="numeric" placeholder="••••••" autocomplete="current-password" aria-label="Şifre">
+    <div id="pwErr" class="err"></div>
+    <button class="btn primary block">Giriş Yap</button>
+  </form>
+</div>
+
+<!-- UYGULAMA -->
+<div id="app" class="app" hidden>
+  <aside class="side">
+    <div class="brand"><span class="logo sm">₺</span><span id="bizName"></span></div>
+    <nav id="nav"></nav>
+  </aside>
+  <div class="content">
+    <header class="top">
+      <h2 id="viewTitle"></h2>
+      <div class="top-ctrl">
+        <div id="perWrap">
+          <select id="perSel" aria-label="Dönem">
+            <option value="today">Bugün</option>
+            <option value="week">Bu Hafta</option>
+            <option value="month" selected>Bu Ay</option>
+            <option value="lastmonth">Geçen Ay</option>
+            <option value="year">Bu Yıl</option>
+            <option value="all">Tüm Zamanlar</option>
+            <option value="custom">Özel Aralık…</option>
+          </select>
+          <span id="customRange" hidden>
+            <input type="date" id="perFrom" aria-label="Başlangıç">
+            <input type="date" id="perTo" aria-label="Bitiş">
+          </span>
+        </div>
+        <button class="icon-btn" data-act="theme" title="Tema değiştir"></button>
+        <button class="icon-btn" data-act="logout" title="Çıkış yap"></button>
+      </div>
+    </header>
+    <main id="main"></main>
+  </div>
+</div>
+<input type="file" id="restoreFile" accept=".json,application/json" hidden>
+<div id="toast"></div>
+
+<script>
+/* ============================================================
+   Kasa & Stok Paneli — tek dosya, çevrimdışı çalışır.
+   Veriler bu tarayıcının localStorage alanında tutulur.
+   Not: Şifre kontrolü tarayıcı tarafındadır; dosyaya erişen biri
+   kodu okuyabilir. Düzenli olarak Ayarlar > Yedek Al yapın.
+   ============================================================ */
+const PASS = '001002';
+const KEY = 'kasaStokPaneli_v1';
+const INC_M = {nakit:'Nakit', pos:'POS (Kart)', havale:'Havale / EFT'};
+const EXP_M = {nakit:'Nakit', kart:'Kart', havale:'Havale / EFT'};
+const TYPES = {stok:'Stok Malzemesi', sabit:'Sabit Gider', diger:'Diğer Gider'};
+const AYLAR = ['Oca','Şub','Mar','Nis','May','Haz','Tem','Ağu','Eyl','Eki','Kas','Ara'];
+const AYLAR_UZUN = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'];
+
+/* ---------- yardımcılar ---------- */
+const $ = s => document.querySelector(s);
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+const pad = n => String(n).padStart(2, '0');
+const ymd = d => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+const today = () => ymd(new Date());
+const parseD = s => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); };
+const fmtD = s => { const [y, m, d] = s.split('-'); return d + '.' + m + '.' + y; };
+const MF = new Intl.NumberFormat('tr-TR', {style:'currency', currency:'TRY', minimumFractionDigits:2, maximumFractionDigits:2});
+const money = n => MF.format(n || 0);
+const num = (n, d = 2) => new Intl.NumberFormat('tr-TR', {maximumFractionDigits:d}).format(n || 0);
+const short = n => Math.abs(n) >= 1e6 ? num(n / 1e6, 1) + 'M' : Math.abs(n) >= 1e3 ? num(n / 1e3, 1) + 'B' : num(n, 0);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const sum = (arr, f) => arr.reduce((s, x) => s + (f ? f(x) : x), 0);
+const inR = (d, a, b) => d >= a && d <= b;
+// "1.250,50" / "1250,5" / "1250.5" / "1.250" hepsini doğru okur
+function toNum(v) {
+  v = String(v ?? '').trim().replace(/\s|₺/g, '');
+  if (!v) return 0;
+  if (v.includes(',')) v = v.replace(/\./g, '').replace(',', '.');
+  else if (/^\d{1,3}(\.\d{3})+$/.test(v)) v = v.replace(/\./g, '');
+  const n = parseFloat(v);
+  return isFinite(n) ? Math.round(n * 1000) / 1000 : 0;
+}
+const I = (p, s = 18) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${p}</svg>`;
+const IC = {
+  dash:'<rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/>',
+  up:'<polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/>',
+  down:'<polyline points="22 17 13.5 8.5 8.5 13.5 2 7"/><polyline points="16 17 22 17 22 11"/>',
+  box:'<path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="m3 8 9 5 9-5"/><path d="M12 13v8"/>',
+  chart:'<path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/>',
+  set:'<line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/>',
+  out:'<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>',
+  trash:'<polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>',
+  theme:'<circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 0 0 18z" fill="currentColor"/>',
+  print:'<polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/>',
+  dl:'<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>',
+  ul:'<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>',
+  plus:'<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>'
+};
+
+/* ---------- veri ---------- */
+function seed() {
+  const stok = [['Kola / Su / Meyve Suyu','adet',24],['Sucuk','kg',2],['Kaşar','kg',2],['Et','kg',3],['Tavuk','kg',3],['Margarin','kg',2],['Salam','kg',1],['Patates','kg',10],['Ketçap / Mayonez','adet',4],['Sebze','kg',5]];
+  const sabit = ['Kira','Elektrik','Doğalgaz','Su Faturası','Personel Maaşı','İnternet / Telefon'];
+  const diger = ['Ekmek','Ambalaj / Sarf Malzeme','Temizlik','Bakım / Onarım','Diğer'];
+  return {
+    v:1,
+    settings:{name:'İşletmem', posRate:0},
+    cats:[
+      ...stok.map(([n, u, m]) => ({id:uid(), name:n, type:'stok', unit:u, min:m})),
+      ...sabit.map(n => ({id:uid(), name:n, type:'sabit'})),
+      ...diger.map(n => ({id:uid(), name:n, type:'diger'}))
+    ],
+    inc:[],  // {id,ts,date,method,amount,note}
+    exp:[],  // {id,ts,date,catId,qty,amount,method,note}
+    mov:[]   // {id,ts,date,catId,type:'in'|'out'|'adj',qty,note,ref}
+  };
+}
+function load() { try { const d = JSON.parse(localStorage.getItem(KEY)); return d && d.cats ? d : null; } catch { return null; } }
+function save() { try { localStorage.setItem(KEY, JSON.stringify(db)); } catch (e) { toast('Kaydedilemedi: tarayıcı depolaması dolu veya kapalı'); } }
+let db = load() || seed();
+if (!load()) save();
+
+const catById = id => db.cats.find(c => c.id === id) || {id, name:'(silinmiş kategori)', type:'diger', unit:''};
+const stockOf = cid => sum(db.mov.filter(m => m.catId === cid), m => m.type === 'out' ? -m.qty : m.qty);
+function avgCost(cid) {
+  const e = db.exp.filter(x => x.catId === cid && x.qty > 0);
+  const q = sum(e, x => x.qty);
+  return q ? sum(e, x => x.amount) / q : 0;
+}
+
+/* ---------- dönem ---------- */
+const per = {key:'month', from:'', to:''};
+function range() {
+  const n = new Date(), t = today(), Y = n.getFullYear(), M = n.getMonth();
+  switch (per.key) {
+    case 'today': return [t, t];
+    case 'week': { const d = new Date(n); d.setDate(d.getDate() - (d.getDay() + 6) % 7); const e = new Date(d); e.setDate(e.getDate() + 6); return [ymd(d), ymd(e)]; }
+    case 'month': return [ymd(new Date(Y, M, 1)), ymd(new Date(Y, M + 1, 0))];
+    case 'lastmonth': return [ymd(new Date(Y, M - 1, 1)), ymd(new Date(Y, M, 0))];
+    case 'year': return [Y + '-01-01', Y + '-12-31'];
+    case 'all': {
+      const ds = [...db.inc, ...db.exp, ...db.mov].map(x => x.date).sort();
+      return ds.length ? [ds[0], ds[ds.length - 1] > t ? ds[ds.length - 1] : t] : [t, t];
+    }
+    case 'custom': { const a = per.from || t, b = per.to || t; return a <= b ? [a, b] : [b, a]; }
+  }
+}
+function perLabel() {
+  const [a, b] = range();
+  return a === b ? fmtD(a) : fmtD(a) + ' – ' + fmtD(b);
+}
+function stats(a, b) {
+  const inc = db.inc.filter(x => inR(x.date, a, b)), exp = db.exp.filter(x => inR(x.date, a, b));
+  const byM = {nakit:0, pos:0, havale:0};
+  inc.forEach(x => byM[x.method] = (byM[x.method] || 0) + x.amount);
+  const byCat = {}, byType = {stok:0, sabit:0, diger:0};
+  exp.forEach(x => { byCat[x.catId] = (byCat[x.catId] || 0) + x.amount; byType[catById(x.catId).type] += x.amount; });
+  const gelir = sum(inc, x => x.amount), gider = sum(exp, x => x.amount);
+  const kom = byM.pos * (db.settings.posRate || 0) / 100;
+  const kar = gelir - gider - kom;
+  return {inc, exp, byM, byCat, byType, gelir, gider, kom, kar, marj: gelir ? kar / gelir * 100 : 0};
+}
+
+/* ---------- arayüz parçaları ---------- */
+const kpi = (l, v, s, cls, k) => `<div class="card kpi ${k || ''}"><div class="l">${l}</div><div class="v ${cls || ''}">${v}</div>${s ? `<div class="s">${s}</div>` : ''}</div>`;
+const fld = (l, inner, extra = '') => `<div class="field" ${extra}><label>${l}</label>${inner}</div>`;
+const empty = t => `<div class="empty">${t}</div>`;
+const delBtn = (act, id) => `<button class="icon-btn sm del" data-act="${act}" data-id="${id}" title="Sil">${I(IC.trash, 16)}</button>`;
+const pct = (v, t) => t ? '%' + num(v / t * 100, 1) : '—';
+
+function barsHTML(rows) {
+  const max = Math.max(...rows.map(r => r.v), 0);
+  if (!max) return empty('Bu dönemde kayıt yok');
+  const tot = sum(rows, r => r.v);
+  return `<div class="bars">${rows.map(r => `<div>
+    <div class="bl"><span>${esc(r.l)}</span><span><b>${money(r.v)}</b> <span class="muted">${pct(r.v, tot)}</span></span></div>
+    <div class="track"><div class="fill" style="width:${r.v / max * 100}%;background:${r.c || 'var(--primary)'}"></div></div></div>`).join('')}</div>`;
+}
+const methodBars = s => barsHTML([
+  {l:'Nakit', v:s.byM.nakit, c:'var(--green)'},
+  {l:'POS (Kart)', v:s.byM.pos, c:'var(--blue)'},
+  {l:'Havale / EFT', v:s.byM.havale, c:'var(--primary)'}
+]);
+const catBars = (s, lim) => barsHTML(Object.entries(s.byCat).sort((a, b) => b[1] - a[1]).slice(0, lim)
+  .map(([id, v]) => ({l:catById(id).name, v, c:'var(--red)'})));
+
+function buckets(a, b) {
+  const s = parseD(a), e = parseD(b), days = Math.round((e - s) / 864e5) + 1, out = [];
+  if (days <= 45) {
+    for (const d = new Date(s); d <= e; d.setDate(d.getDate() + 1)) { const k = ymd(d); out.push({l:pad(d.getDate()) + '.' + pad(d.getMonth() + 1), a:k, b:k}); }
+  } else {
+    for (let m = new Date(s.getFullYear(), s.getMonth(), 1); m <= e; m = new Date(m.getFullYear(), m.getMonth() + 1, 1)) {
+      const f = ymd(m), l = ymd(new Date(m.getFullYear(), m.getMonth() + 1, 0));
+      out.push({l:AYLAR[m.getMonth()] + ' ' + String(m.getFullYear()).slice(2), a:f < a ? a : f, b:l > b ? b : l});
+    }
+  }
+  out.forEach(o => {
+    o.g = sum(db.inc.filter(x => inR(x.date, o.a, o.b)), x => x.amount);
+    o.e = sum(db.exp.filter(x => inR(x.date, o.a, o.b)), x => x.amount);
+  });
+  return out;
+}
+function chart(bk) {
+  if (!bk.some(o => o.g || o.e)) return empty('Grafik için bu dönemde kayıt yok');
+  const W = Math.max(640, bk.length * 30), H = 230, L = 52, R = 8, T = 12, B = 26;
+  const raw = Math.max(...bk.map(o => Math.max(o.g, o.e)));
+  const p = Math.pow(10, Math.floor(Math.log10(raw))), max = Math.ceil(raw / p * 2) / 2 * p || 1;
+  const cw = (W - L - R) / bk.length, bw = Math.max(3, Math.min(14, cw * .34)), ih = H - T - B;
+  const y = v => T + ih - v / max * ih;
+  const step = Math.ceil(bk.length / 16);
+  let g = '';
+  for (let i = 0; i <= 4; i++) {
+    const v = max * i / 4, yy = y(v);
+    g += `<line x1="${L}" x2="${W - R}" y1="${yy}" y2="${yy}" stroke="var(--border)" ${i ? 'stroke-dasharray="3 3"' : ''}/><text x="${L - 6}" y="${yy + 4}" text-anchor="end" font-size="11" fill="var(--muted)">${short(v)}</text>`;
+  }
+  bk.forEach((o, i) => {
+    const cx = L + cw * i + cw / 2;
+    g += `<g><title>${o.l}\nGelir: ${money(o.g)}\nGider: ${money(o.e)}\nFark: ${money(o.g - o.e)}</title>
+      <rect x="${cx - cw / 2}" y="${T}" width="${cw}" height="${ih}" fill="transparent"/>
+      <rect x="${cx - bw - 1}" y="${y(o.g)}" width="${bw}" height="${Math.max(0, T + ih - y(o.g))}" rx="2" fill="var(--green)"/>
+      <rect x="${cx + 1}" y="${y(o.e)}" width="${bw}" height="${Math.max(0, T + ih - y(o.e))}" rx="2" fill="var(--red)"/></g>`;
+    if (i % step === 0) g += `<text x="${cx}" y="${H - 8}" text-anchor="middle" font-size="11" fill="var(--muted)">${o.l}</text>`;
+  });
+  return `<div class="chart-wrap"><svg viewBox="0 0 ${W} ${H}" style="width:100%;min-width:${Math.min(W, 900)}px" role="img" aria-label="Gelir gider grafiği">${g}</svg></div>`;
+}
+function catOptions(sel, filterAll) {
+  return (filterAll ? `<option value="">Tüm kategoriler</option>` : '') +
+    Object.entries(TYPES).map(([t, tl]) => {
+      const cs = db.cats.filter(c => c.type === t);
+      return cs.length ? `<optgroup label="${tl}">${cs.map(c => `<option value="${c.id}" ${c.id === sel ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</optgroup>` : '';
+    }).join('');
+}
+const methodOpts = (M, sel) => Object.entries(M).map(([k, v]) => `<option value="${k}" ${k === sel ? 'selected' : ''}>${v}</option>`).join('');
+
+/* ---------- görünümler ---------- */
+const VIEWS = {panel:['Panel', IC.dash], gelir:['Gelirler', IC.up], gider:['Giderler', IC.down], stok:['Stok', IC.box], rapor:['Raporlar', IC.chart], ayar:['Ayarlar', IC.set]};
+let view = 'panel';
+const mem = {};   // formlarda son seçimleri hatırlar
+const R = {}, AFTER = {};
+
+R.panel = () => {
+  const [a, b] = range(), s = stats(a, b);
+  const crit = db.cats.filter(c => c.type === 'stok').map(c => ({c, st:stockOf(c.id)})).filter(x => x.st <= (x.c.min || 0));
+  const recent = [...s.inc.map(x => ({...x, k:'inc'})), ...s.exp.map(x => ({...x, k:'exp'}))]
+    .sort((x, y) => y.date.localeCompare(x.date) || y.ts - x.ts).slice(0, 8);
+  return `
+  <div class="chips no-print">
+    <button class="btn primary" data-act="nav" data-v="gelir">${I(IC.plus, 16)} Gelir Gir</button>
+    <button class="btn" data-act="nav" data-v="gider">${I(IC.plus, 16)} Gider Gir</button>
+    <button class="btn" data-act="nav" data-v="stok">${I(IC.box, 16)} Stok Hareketi</button>
+  </div>
+  <div class="grid g4">
+    ${kpi('Toplam Gelir', money(s.gelir), s.inc.length + ' kayıt', '', 'k-g')}
+    ${kpi('Toplam Gider', money(s.gider), s.exp.length + ' kayıt', '', 'k-r')}
+    ${kpi('Net Kâr', money(s.kar), s.kom ? 'POS komisyonu düşüldü: ' + money(s.kom) : 'Gelir − Gider', s.kar >= 0 ? 'pos' : 'neg', 'k-p')}
+    ${kpi('Kâr Marjı', s.gelir ? '%' + num(s.marj, 1) : '—', perLabel(), s.kar >= 0 ? '' : 'neg', 'k-b')}
+  </div>
+  <div class="card"><h3>Gelir / Gider <span class="legend"><span><i style="background:var(--green)"></i>Gelir</span><span><i style="background:var(--red)"></i>Gider</span></span></h3>${chart(buckets(a, b))}</div>
+  <div class="grid g2">
+    <div class="card"><h3>Gelir Dağılımı <small>ödeme şekline göre</small></h3>${methodBars(s)}</div>
+    <div class="card"><h3>En Büyük Giderler <small>ilk 8 kalem</small></h3>${catBars(s, 8)}</div>
+  </div>
+  <div class="grid g2">
+    <div class="card"><h3>Kritik Stok <span class="badge ${crit.length ? 'b-red' : 'b-ok'}">${crit.length ? crit.length + ' ürün' : 'Sorun yok'}</span></h3>
+      ${crit.length ? `<div class="rows">${crit.map(x => `<div><span>${esc(x.c.name)}<div class="t">Minimum: ${num(x.c.min)} ${esc(x.c.unit)}</div></span><span class="badge ${x.st <= 0 ? 'b-red' : 'b-amber'}">${num(x.st)} ${esc(x.c.unit)}</span></div>`).join('')}</div>` : empty('Tüm ürünler minimum seviyenin üzerinde')}
+    </div>
+    <div class="card"><h3>Son İşlemler</h3>
+      ${recent.length ? `<div class="rows">${recent.map(x => x.k === 'inc'
+        ? `<div><span>${INC_M[x.method]} tahsilat<div class="t">${fmtD(x.date)}${x.note ? ' · ' + esc(x.note) : ''}</div></span><b class="pos">+${money(x.amount)}</b></div>`
+        : `<div><span>${esc(catById(x.catId).name)}<div class="t">${fmtD(x.date)}${x.note ? ' · ' + esc(x.note) : ''}</div></span><b class="neg">−${money(x.amount)}</b></div>`).join('')}</div>` : empty('Bu dönemde işlem yok')}
+    </div>
+  </div>`;
+};
+
+R.gelir = () => {
+  const [a, b] = range(), s = stats(a, b);
+  const list = [...s.inc].sort((x, y) => y.date.localeCompare(x.date) || y.ts - x.ts);
+  return `
+  <div class="card no-print"><h3>Gelir Girişi <small>Gün sonu kasa toplamlarını tek seferde girebilirsiniz — boş bırakılan alanlar kaydedilmez</small></h3>
+    <form class="form" onsubmit="return addInc(event)">
+      ${fld('Tarih', `<input type="date" name="date" value="${mem.incDate || today()}" required>`)}
+      ${fld('Nakit (₺)', `<input name="nakit" inputmode="decimal" placeholder="0,00" autocomplete="off">`)}
+      ${fld('POS / Kart (₺)', `<input name="pos" inputmode="decimal" placeholder="0,00" autocomplete="off">`)}
+      ${fld('Havale / EFT (₺)', `<input name="havale" inputmode="decimal" placeholder="0,00" autocomplete="off">`)}
+      ${fld('Not', `<input name="note" placeholder="İsteğe bağlı" maxlength="120">`)}
+      <button class="btn primary">Kaydet</button>
+    </form>
+  </div>
+  <div class="grid g4">
+    ${kpi('Nakit', money(s.byM.nakit), pct(s.byM.nakit, s.gelir), '', 'k-g')}
+    ${kpi('POS (Kart)', money(s.byM.pos), s.kom ? 'Komisyon: ' + money(s.kom) : pct(s.byM.pos, s.gelir), '', 'k-b')}
+    ${kpi('Havale / EFT', money(s.byM.havale), pct(s.byM.havale, s.gelir), '', 'k-p')}
+    ${kpi('Toplam Gelir', money(s.gelir), perLabel(), 'pos', 'k-g')}
+  </div>
+  <div class="card"><h3>Gelir Kayıtları <small>${list.length} kayıt · ${perLabel()}</small></h3>
+    ${list.length ? `<div class="tbl"><table>
+      <thead><tr><th>Tarih</th><th>Ödeme Şekli</th><th>Not</th><th class="r">Tutar</th><th class="no-print"></th></tr></thead>
+      <tbody>${list.map(x => `<tr><td>${fmtD(x.date)}</td><td><span class="badge b-${x.method}">${INC_M[x.method]}</span></td><td class="wrap">${esc(x.note)}</td><td class="r">${money(x.amount)}</td><td class="r no-print">${delBtn('del-inc', x.id)}</td></tr>`).join('')}</tbody>
+      <tfoot><tr><td colspan="3">Toplam</td><td class="r">${money(s.gelir)}</td><td class="no-print"></td></tr></tfoot>
+    </table></div>` : empty('Bu dönemde gelir kaydı yok')}
+  </div>`;
+};
+
+R.gider = () => {
+  const [a, b] = range(), s = stats(a, b);
+  const f = mem.expFilter || '';
+  const list = s.exp.filter(x => !f || x.catId === f).sort((x, y) => y.date.localeCompare(x.date) || y.ts - x.ts);
+  const tot = sum(list, x => x.amount);
+  return `
+  <div class="card no-print"><h3>Gider Girişi <small>Stok malzemelerinde miktar girerseniz stok otomatik artar</small></h3>
+    <form class="form" onsubmit="return addExp(event)">
+      ${fld('Tarih', `<input type="date" name="date" value="${mem.expDate || today()}" required>`)}
+      ${fld('Gider Kalemi', `<select name="cat" id="expCat" onchange="expCatChange()" required>${catOptions(mem.expCat)}</select>`)}
+      ${fld('Miktar <span id="expUnit"></span>', `<input name="qty" inputmode="decimal" placeholder="0" autocomplete="off">`, 'id="expQtyWrap"')}
+      ${fld('Tutar (₺)', `<input name="amount" inputmode="decimal" placeholder="0,00" required autocomplete="off">`)}
+      ${fld('Ödeme Şekli', `<select name="method">${methodOpts(EXP_M, mem.expMethod || 'nakit')}</select>`)}
+      ${fld('Açıklama / Tedarikçi', `<input name="note" placeholder="İsteğe bağlı" maxlength="120">`)}
+      <button class="btn primary">Kaydet</button>
+    </form>
+  </div>
+  <div class="grid g4">
+    ${kpi('Stok Malzemeleri', money(s.byType.stok), pct(s.byType.stok, s.gider), '', 'k-a')}
+    ${kpi('Sabit Giderler', money(s.byType.sabit), pct(s.byType.sabit, s.gider) + ' · kira, elektrik…', '', 'k-p')}
+    ${kpi('Diğer Giderler', money(s.byType.diger), pct(s.byType.diger, s.gider), '', 'k-b')}
+    ${kpi('Toplam Gider', money(s.gider), perLabel(), 'neg', 'k-r')}
+  </div>
+  <div class="card"><h3>Gider Kayıtları <small>${list.length} kayıt · ${perLabel()}</small>
+      <select class="no-print" style="width:auto;margin-left:auto" onchange="mem.expFilter=this.value;render()">${catOptions(f, true)}</select></h3>
+    ${list.length ? `<div class="tbl"><table>
+      <thead><tr><th>Tarih</th><th>Kalem</th><th>Açıklama</th><th class="r">Miktar</th><th>Ödeme</th><th class="r">Tutar</th><th class="no-print"></th></tr></thead>
+      <tbody>${list.map(x => { const c = catById(x.catId); return `<tr><td>${fmtD(x.date)}</td><td>${esc(c.name)}</td><td class="wrap">${esc(x.note)}</td><td class="r">${x.qty ? num(x.qty) + ' ' + esc(c.unit || '') : '<span class="muted">—</span>'}</td><td><span class="badge b-${x.method}">${EXP_M[x.method]}</span></td><td class="r">${money(x.amount)}</td><td class="r no-print">${delBtn('del-exp', x.id)}</td></tr>`; }).join('')}</tbody>
+      <tfoot><tr><td colspan="5">Toplam</td><td class="r">${money(tot)}</td><td class="no-print"></td></tr></tfoot>
+    </table></div>` : empty('Bu dönemde gider kaydı yok')}
+  </div>`;
+};
+AFTER.gider = () => expCatChange();
+
+function stockRows(a, b) {
+  return db.cats.filter(c => c.type === 'stok').map(c => {
+    const mv = db.mov.filter(m => m.catId === c.id && inR(m.date, a, b));
+    const st = stockOf(c.id), avg = avgCost(c.id);
+    const outQ = sum(mv.filter(m => m.type === 'out'), m => m.qty);
+    return {c, st, avg, val:Math.max(st, 0) * avg, inQ:sum(mv.filter(m => m.type === 'in'), m => m.qty), outQ, outCost:outQ * avg};
+  });
+}
+R.stok = () => {
+  const [a, b] = range(), rows = stockRows(a, b);
+  const crit = rows.filter(r => r.st <= (r.c.min || 0)).length;
+  const moves = db.mov.filter(m => inR(m.date, a, b)).sort((x, y) => y.date.localeCompare(x.date) || y.ts - x.ts);
+  const tl = {in:'Giriş', out:'Çıkış / Kullanım', adj:'Sayım Düzeltme'};
+  return `
+  <div class="card no-print"><h3>Stok Hareketi <small>Satın alımları “Giderler”den girin; buradan kullanım/çıkış ve sayım yapın</small></h3>
+    <form class="form" onsubmit="return addMov(event)">
+      ${fld('Ürün', `<select name="cat" required>${db.cats.filter(c => c.type === 'stok').map(c => `<option value="${c.id}" ${c.id === mem.movCat ? 'selected' : ''}>${esc(c.name)} (${num(stockOf(c.id))} ${esc(c.unit)})</option>`).join('')}</select>`)}
+      ${fld('İşlem', `<select name="type">
+          <option value="out" ${mem.movType === 'out' ? 'selected' : ''}>Çıkış / Kullanım</option>
+          <option value="in" ${mem.movType === 'in' ? 'selected' : ''}>Giriş (faturasız / iade)</option>
+          <option value="adj" ${mem.movType === 'adj' ? 'selected' : ''}>Sayım — mevcut miktarı yaz</option></select>`)}
+      ${fld('Miktar', `<input name="qty" inputmode="decimal" placeholder="0" required autocomplete="off">`)}
+      ${fld('Tarih', `<input type="date" name="date" value="${mem.movDate || today()}" required>`)}
+      ${fld('Not', `<input name="note" placeholder="İsteğe bağlı" maxlength="120">`)}
+      <button class="btn primary">Kaydet</button>
+    </form>
+  </div>
+  <div class="grid g4">
+    ${kpi('Stok Değeri', money(sum(rows, r => r.val)), 'ortalama alış fiyatı ile', '', 'k-p')}
+    ${kpi('Ürün Sayısı', rows.length, 'takip edilen malzeme', '', 'k-b')}
+    ${kpi('Kritik Ürün', crit, 'minimumun altında', crit ? 'neg' : 'pos', crit ? 'k-r' : 'k-g')}
+    ${kpi('Dönem Tüketimi', money(sum(rows, r => r.outCost)), 'tahmini maliyet · ' + perLabel(), '', 'k-a')}
+  </div>
+  <div class="card"><h3>Mevcut Stok</h3>
+    ${rows.length ? `<div class="tbl"><table>
+      <thead><tr><th>Ürün</th><th class="r">Mevcut</th><th class="r">Minimum</th><th class="r">Ort. Alış</th><th class="r">Stok Değeri</th><th class="r">Dönem Giriş</th><th class="r">Dönem Çıkış</th><th>Durum</th></tr></thead>
+      <tbody>${rows.map(r => `<tr><td>${esc(r.c.name)}</td><td class="r"><b>${num(r.st)}</b> ${esc(r.c.unit)}</td><td class="r">${num(r.c.min)} ${esc(r.c.unit)}</td><td class="r">${r.avg ? money(r.avg) + '/' + esc(r.c.unit) : '—'}</td><td class="r">${money(r.val)}</td><td class="r">${num(r.inQ)}</td><td class="r">${num(r.outQ)}</td>
+        <td>${r.st <= 0 ? '<span class="badge b-red">Tükendi</span>' : r.st <= (r.c.min || 0) ? '<span class="badge b-amber">Kritik</span>' : '<span class="badge b-ok">Yeterli</span>'}</td></tr>`).join('')}</tbody>
+    </table></div>` : empty('Stok kategorisi yok — Ayarlar’dan ekleyin')}
+  </div>
+  <div class="card"><h3>Stok Hareketleri <small>${moves.length} hareket · ${perLabel()}</small></h3>
+    ${moves.length ? `<div class="tbl"><table>
+      <thead><tr><th>Tarih</th><th>Ürün</th><th>İşlem</th><th class="r">Miktar</th><th>Not</th><th class="no-print"></th></tr></thead>
+      <tbody>${moves.map(m => { const c = catById(m.catId), sign = m.type === 'out' ? -m.qty : m.qty; return `<tr><td>${fmtD(m.date)}</td><td>${esc(c.name)}</td><td><span class="badge ${m.type === 'out' ? 'b-red' : m.type === 'in' ? 'b-ok' : 'b-amber'}">${tl[m.type]}</span>${m.ref ? ' <span class="badge b-gray">alış faturası</span>' : ''}</td><td class="r ${sign < 0 ? 'neg' : 'pos'}">${sign > 0 ? '+' : ''}${num(sign)} ${esc(c.unit)}</td><td class="wrap">${esc(m.note)}</td><td class="r no-print">${m.ref ? '' : delBtn('del-mov', m.id)}</td></tr>`; }).join('')}</tbody>
+    </table></div>` : empty('Bu dönemde stok hareketi yok')}
+  </div>`;
+};
+
+R.rapor = () => {
+  const [a, b] = range(), s = stats(a, b);
+  const days = Math.round((parseD(b) - parseD(a)) / 864e5) + 1;
+  const actDays = new Set(s.inc.map(x => x.date)).size;
+  const cats = Object.entries(s.byCat).sort((x, y) => y[1] - x[1]);
+  const srows = stockRows(a, b).filter(r => r.inQ || r.outQ);
+  // son 12 ay
+  const n = new Date(), months = [];
+  for (let i = 11; i >= 0; i--) {
+    const m = new Date(n.getFullYear(), n.getMonth() - i, 1);
+    const ms = stats(ymd(m), ymd(new Date(m.getFullYear(), m.getMonth() + 1, 0)));
+    months.push({l:AYLAR_UZUN[m.getMonth()] + ' ' + m.getFullYear(), ...ms});
+  }
+  // günlük döküm
+  const dayMap = {};
+  s.inc.forEach(x => { const d = dayMap[x.date] ||= {nakit:0, pos:0, havale:0, g:0, e:0}; d[x.method] += x.amount; d.g += x.amount; });
+  s.exp.forEach(x => { const d = dayMap[x.date] ||= {nakit:0, pos:0, havale:0, g:0, e:0}; d.e += x.amount; });
+  const dayList = Object.entries(dayMap).sort((x, y) => y[0].localeCompare(x[0]));
+  const rate = db.settings.posRate || 0;
+  return `
+  <div class="print-head"><h2 style="margin:0">${esc(db.settings.name)} — Gelir / Gider Raporu</h2><p class="muted" style="margin:4px 0 0">Dönem: ${perLabel()} · Oluşturma: ${fmtD(today())}</p></div>
+  <div class="chips no-print">
+    <button class="btn" data-act="print">${I(IC.print, 16)} Yazdır / PDF</button>
+    <button class="btn" data-act="csv">${I(IC.dl, 16)} Excel (CSV) İndir</button>
+  </div>
+  <div class="grid g2">
+    <div class="card"><h3>Dönem Özeti <small>${perLabel()} · ${days} gün</small></h3>
+      <div class="tbl"><table class="sum-tbl"><tbody>
+        <tr><td>Nakit tahsilat</td><td class="r">${money(s.byM.nakit)}</td></tr>
+        <tr><td>POS (kart) tahsilat</td><td class="r">${money(s.byM.pos)}</td></tr>
+        <tr><td>Havale / EFT</td><td class="r">${money(s.byM.havale)}</td></tr>
+        <tr class="hl"><td>Brüt Gelir</td><td class="r pos">${money(s.gelir)}</td></tr>
+        <tr><td>Stok malzeme alımları</td><td class="r">${money(s.byType.stok)}</td></tr>
+        <tr><td>Sabit giderler</td><td class="r">${money(s.byType.sabit)}</td></tr>
+        <tr><td>Diğer giderler</td><td class="r">${money(s.byType.diger)}</td></tr>
+        ${rate ? `<tr><td>POS komisyonu (%${num(rate)})</td><td class="r">${money(s.kom)}</td></tr>` : ''}
+        <tr class="hl"><td>Toplam Gider</td><td class="r neg">${money(s.gider + s.kom)}</td></tr>
+        <tr class="hl"><td>Net Kâr</td><td class="r ${s.kar >= 0 ? 'pos' : 'neg'}">${money(s.kar)}</td></tr>
+        <tr><td>Kâr marjı</td><td class="r">${s.gelir ? '%' + num(s.marj, 1) : '—'}</td></tr>
+        <tr><td>Satış yapılan gün</td><td class="r">${actDays}</td></tr>
+        <tr><td>Günlük ortalama gelir</td><td class="r">${money(actDays ? s.gelir / actDays : 0)}</td></tr>
+        <tr><td>Günlük ortalama gider</td><td class="r">${money(s.gider / days)}</td></tr>
+      </tbody></table></div>
+    </div>
+    <div class="grid" style="align-content:start">
+      <div class="card"><h3>Tahsilat Dağılımı</h3>${methodBars(s)}</div>
+      <div class="card"><h3>Gider Grupları</h3>${barsHTML([{l:'Stok malzemeleri', v:s.byType.stok, c:'var(--amber)'}, {l:'Sabit giderler', v:s.byType.sabit, c:'var(--primary)'}, {l:'Diğer giderler', v:s.byType.diger, c:'var(--blue)'}])}</div>
+    </div>
+  </div>
+  <div class="card"><h3>Gider Kalemleri Detayı</h3>
+    ${cats.length ? `<div class="tbl"><table>
+      <thead><tr><th>Kalem</th><th>Grup</th><th class="r">Kayıt</th><th class="r">Alınan Miktar</th><th class="r">Tutar</th><th class="r">Pay</th></tr></thead>
+      <tbody>${cats.map(([id, v]) => { const c = catById(id), e = s.exp.filter(x => x.catId === id), q = sum(e, x => x.qty || 0); return `<tr><td>${esc(c.name)}</td><td class="muted">${TYPES[c.type]}</td><td class="r">${e.length}</td><td class="r">${q ? num(q) + ' ' + esc(c.unit) : '—'}</td><td class="r">${money(v)}</td><td class="r">${pct(v, s.gider)}</td></tr>`; }).join('')}</tbody>
+      <tfoot><tr><td colspan="4">Toplam</td><td class="r">${money(s.gider)}</td><td class="r">%100</td></tr></tfoot>
+    </table></div>` : empty('Bu dönemde gider yok')}
+  </div>
+  <div class="card"><h3>Stok Tüketimi <small>alınan / kullanılan miktar ve tahmini kullanım maliyeti</small></h3>
+    ${srows.length ? `<div class="tbl"><table>
+      <thead><tr><th>Ürün</th><th class="r">Giren</th><th class="r">Kullanılan</th><th class="r">Ort. Alış</th><th class="r">Kullanım Maliyeti</th><th class="r">Kalan Stok</th></tr></thead>
+      <tbody>${srows.map(r => `<tr><td>${esc(r.c.name)}</td><td class="r">${num(r.inQ)} ${esc(r.c.unit)}</td><td class="r">${num(r.outQ)} ${esc(r.c.unit)}</td><td class="r">${r.avg ? money(r.avg) : '—'}</td><td class="r">${money(r.outCost)}</td><td class="r">${num(r.st)} ${esc(r.c.unit)}</td></tr>`).join('')}</tbody>
+      <tfoot><tr><td colspan="4">Toplam kullanım maliyeti</td><td class="r">${money(sum(srows, r => r.outCost))}</td><td></td></tr></tfoot>
+    </table></div>` : empty('Bu dönemde stok hareketi yok')}
+  </div>
+  <div class="card"><h3>Aylık Karşılaştırma <small>son 12 ay</small></h3>
+    <div class="tbl"><table>
+      <thead><tr><th>Ay</th><th class="r">Nakit</th><th class="r">POS</th><th class="r">Havale</th><th class="r">Gelir</th><th class="r">Gider</th><th class="r">Net Kâr</th><th class="r">Marj</th></tr></thead>
+      <tbody>${months.map(m => `<tr><td>${m.l}</td><td class="r">${money(m.byM.nakit)}</td><td class="r">${money(m.byM.pos)}</td><td class="r">${money(m.byM.havale)}</td><td class="r">${money(m.gelir)}</td><td class="r">${money(m.gider)}</td><td class="r ${m.kar >= 0 ? 'pos' : 'neg'}">${money(m.kar)}</td><td class="r">${m.gelir ? '%' + num(m.marj, 1) : '—'}</td></tr>`).join('')}</tbody>
+      <tfoot><tr><td>12 ay toplam</td><td class="r">${money(sum(months, m => m.byM.nakit))}</td><td class="r">${money(sum(months, m => m.byM.pos))}</td><td class="r">${money(sum(months, m => m.byM.havale))}</td><td class="r">${money(sum(months, m => m.gelir))}</td><td class="r">${money(sum(months, m => m.gider))}</td><td class="r">${money(sum(months, m => m.kar))}</td><td></td></tr></tfoot>
+    </table></div>
+  </div>
+  <div class="card"><h3>Günlük Döküm <small>${perLabel()}</small></h3>
+    ${dayList.length ? `<div class="tbl"><table>
+      <thead><tr><th>Tarih</th><th class="r">Nakit</th><th class="r">POS</th><th class="r">Havale</th><th class="r">Gelir</th><th class="r">Gider</th><th class="r">Fark</th></tr></thead>
+      <tbody>${dayList.map(([d, v]) => `<tr><td>${fmtD(d)}</td><td class="r">${money(v.nakit)}</td><td class="r">${money(v.pos)}</td><td class="r">${money(v.havale)}</td><td class="r">${money(v.g)}</td><td class="r">${money(v.e)}</td><td class="r ${v.g - v.e >= 0 ? 'pos' : 'neg'}">${money(v.g - v.e)}</td></tr>`).join('')}</tbody>
+      <tfoot><tr><td>Toplam</td><td class="r">${money(s.byM.nakit)}</td><td class="r">${money(s.byM.pos)}</td><td class="r">${money(s.byM.havale)}</td><td class="r">${money(s.gelir)}</td><td class="r">${money(s.gider)}</td><td class="r">${money(s.gelir - s.gider)}</td></tr></tfoot>
+    </table></div>` : empty('Bu dönemde kayıt yok')}
+  </div>`;
+};
+
+R.ayar = () => `
+  <div class="grid g2">
+    <div class="card"><h3>Genel</h3>
+      <form class="form" onsubmit="return saveSettings(event)">
+        ${fld('İşletme adı', `<input name="name" value="${esc(db.settings.name)}" maxlength="60">`)}
+        ${fld('POS komisyon oranı (%)', `<input name="posRate" inputmode="decimal" value="${num(db.settings.posRate || 0, 3)}">`)}
+        <button class="btn primary">Kaydet</button>
+      </form>
+      <p class="hint">POS oranı girilirse kart tahsilatlarından komisyon düşülerek net kâr hesaplanır. 0 bırakırsanız hesaba katılmaz.</p>
+    </div>
+    <div class="card"><h3>Yedekleme <small>veriler yalnızca bu tarayıcıda saklanır</small></h3>
+      <div class="chips">
+        <button class="btn primary" data-act="backup">${I(IC.dl, 16)} Yedek Al (JSON)</button>
+        <button class="btn" data-act="restore">${I(IC.ul, 16)} Yedekten Yükle</button>
+        <button class="btn danger" data-act="reset">${I(IC.trash, 16)} Tüm Verileri Sil</button>
+      </div>
+      <p class="hint">Haftada en az bir kez yedek alın. Tarayıcı geçmişi/çerezleri temizlenirse veriler silinebilir. Yedek dosyasını başka bilgisayarda “Yedekten Yükle” ile açabilirsiniz.</p>
+      <p class="hint">Kayıt sayısı: ${db.inc.length} gelir · ${db.exp.length} gider · ${db.mov.length} stok hareketi</p>
+    </div>
+  </div>
+  <div class="card"><h3>Gider Kalemleri ve Stok Ürünleri</h3>
+    <form class="form no-print" onsubmit="return addCat(event)" style="margin-bottom:14px">
+      ${fld('Yeni kalem adı', `<input name="name" required maxlength="50" placeholder="örn. Lavaş">`)}
+      ${fld('Grup', `<select name="type" onchange="this.form.unit.disabled=this.form.min.disabled=this.value!=='stok'">${Object.entries(TYPES).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select>`)}
+      ${fld('Birim (stok için)', `<input name="unit" placeholder="kg, adet, lt…" maxlength="10" value="kg">`)}
+      ${fld('Minimum stok', `<input name="min" inputmode="decimal" placeholder="0">`)}
+      <button class="btn primary">${I(IC.plus, 16)} Ekle</button>
+    </form>
+    <div class="tbl"><table>
+      <thead><tr><th>Ad</th><th>Grup</th><th>Birim</th><th>Min. Stok</th><th class="r">Kayıt</th><th></th></tr></thead>
+      <tbody>${db.cats.map(c => { const used = db.exp.filter(x => x.catId === c.id).length + db.mov.filter(m => m.catId === c.id).length; return `<tr>
+        <td><input value="${esc(c.name)}" data-cf="name" data-id="${c.id}" style="min-width:160px"></td>
+        <td class="muted">${TYPES[c.type]}</td>
+        <td>${c.type === 'stok' ? `<input value="${esc(c.unit)}" data-cf="unit" data-id="${c.id}" style="width:80px">` : '<span class="muted">—</span>'}</td>
+        <td>${c.type === 'stok' ? `<input value="${num(c.min)}" inputmode="decimal" data-cf="min" data-id="${c.id}" style="width:90px">` : '<span class="muted">—</span>'}</td>
+        <td class="r">${used}</td>
+        <td class="r">${used ? '' : delBtn('del-cat', c.id)}</td></tr>`; }).join('')}</tbody>
+    </table></div>
+    <p class="hint">Değişiklikler alandan çıkınca kaydedilir. Kaydı olan kalemler silinemez (geçmiş raporlar bozulmasın diye).</p>
+  </div>`;
+
+/* ---------- işlemler ---------- */
+function addInc(e) {
+  e.preventDefault();
+  const f = new FormData(e.target), date = f.get('date'), note = f.get('note').trim();
+  let n = 0;
+  for (const m of ['nakit', 'pos', 'havale']) {
+    const v = toNum(f.get(m));
+    if (v > 0) { db.inc.push({id:uid(), ts:Date.now(), date, method:m, amount:v, note}); n++; }
+  }
+  if (!n) { toast('En az bir tutar girin'); return false; }
+  mem.incDate = date; save(); render(); toast(n + ' gelir kaydı eklendi');
+  return false;
+}
+function expCatChange() {
+  const sel = $('#expCat'); if (!sel) return;
+  const c = catById(sel.value);
+  $('#expQtyWrap').style.display = c.type === 'stok' ? '' : 'none';
+  $('#expUnit').textContent = c.unit ? '(' + c.unit + ')' : '';
+}
+function addExp(e) {
+  e.preventDefault();
+  const f = new FormData(e.target), c = catById(f.get('cat'));
+  const amount = toNum(f.get('amount')), qty = c.type === 'stok' ? toNum(f.get('qty')) : 0;
+  if (amount <= 0) { toast('Geçerli bir tutar girin'); return false; }
+  const x = {id:uid(), ts:Date.now(), date:f.get('date'), catId:c.id, qty, amount, method:f.get('method'), note:f.get('note').trim()};
+  db.exp.push(x);
+  if (qty > 0) db.mov.push({id:uid(), ts:Date.now(), date:x.date, catId:c.id, type:'in', qty, note:'Alış: ' + money(amount), ref:x.id});
+  Object.assign(mem, {expDate:x.date, expCat:c.id, expMethod:x.method});
+  save(); render();
+  toast(qty > 0 ? `Gider kaydedildi, stok +${num(qty)} ${c.unit}` : 'Gider kaydedildi');
+  return false;
+}
+function addMov(e) {
+  e.preventDefault();
+  const f = new FormData(e.target), cid = f.get('cat'), type = f.get('type'), c = catById(cid);
+  let qty = toNum(f.get('qty'));
+  const cur = stockOf(cid);
+  if (type === 'adj') {
+    if (qty < 0) { toast('Geçerli bir miktar girin'); return false; }
+    qty = Math.round((qty - cur) * 1000) / 1000;
+    if (!qty) { toast('Stok zaten bu miktarda'); return false; }
+  } else {
+    if (qty <= 0) { toast('Geçerli bir miktar girin'); return false; }
+    if (type === 'out' && qty > cur && !confirm(`Mevcut stok ${num(cur)} ${c.unit}. Yine de ${num(qty)} ${c.unit} çıkış yapılsın mı?`)) return false;
+  }
+  db.mov.push({id:uid(), ts:Date.now(), date:f.get('date'), catId:cid, type, qty, note:f.get('note').trim()});
+  Object.assign(mem, {movCat:cid, movType:type, movDate:f.get('date')});
+  save(); render(); toast('Stok güncellendi: ' + c.name + ' → ' + num(stockOf(cid)) + ' ' + c.unit);
+  return false;
+}
+function saveSettings(e) {
+  e.preventDefault();
+  const f = new FormData(e.target);
+  db.settings.name = f.get('name').trim() || 'İşletmem';
+  db.settings.posRate = Math.max(0, toNum(f.get('posRate')));
+  save(); render(); toast('Ayarlar kaydedildi');
+  return false;
+}
+function addCat(e) {
+  e.preventDefault();
+  const f = new FormData(e.target), name = f.get('name').trim(), type = f.get('type');
+  if (!name) return false;
+  if (db.cats.some(c => c.name.toLocaleLowerCase('tr') === name.toLocaleLowerCase('tr'))) { toast('Bu isimde kalem zaten var'); return false; }
+  const c = {id:uid(), name, type};
+  if (type === 'stok') { c.unit = (f.get('unit') || 'adet').trim(); c.min = toNum(f.get('min')); }
+  db.cats.push(c); save(); render(); toast('“' + name + '” eklendi');
+  return false;
+}
+function download(name, text, mime) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([text], {type:mime}));
+  a.download = name; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+function exportCSV() {
+  const [a, b] = range(), s = stats(a, b);
+  const q = v => '"' + String(v ?? '').replace(/"/g, '""') + '"';
+  const n2 = v => String((Math.round(v * 100) / 100)).replace('.', ',');
+  const rows = [['Tarih', 'Tür', 'Kalem / Ödeme Şekli', 'Grup', 'Miktar', 'Birim', 'Ödeme', 'Tutar', 'Not']];
+  s.inc.forEach(x => rows.push([fmtD(x.date), 'Gelir', INC_M[x.method], '', '', '', INC_M[x.method], n2(x.amount), x.note]));
+  s.exp.forEach(x => { const c = catById(x.catId); rows.push([fmtD(x.date), 'Gider', c.name, TYPES[c.type], x.qty ? n2(x.qty) : '', c.unit || '', EXP_M[x.method], n2(-x.amount), x.note]); });
+  rows.sort((x, y) => x[0] === 'Tarih' ? -1 : y[0] === 'Tarih' ? 1 : x[0].split('.').reverse().join().localeCompare(y[0].split('.').reverse().join()));
+  rows.push([], ['', 'Toplam Gelir', '', '', '', '', '', n2(s.gelir)], ['', 'Toplam Gider', '', '', '', '', '', n2(-s.gider)]);
+  if (s.kom) rows.push(['', 'POS Komisyonu', '', '', '', '', '', n2(-s.kom)]);
+  rows.push(['', 'Net Kâr', '', '', '', '', '', n2(s.kar)]);
+  download(`rapor_${a}_${b}.csv`, '﻿' + rows.map(r => r.map(q).join(';')).join('\r\n'), 'text/csv;charset=utf-8');
+}
+
+/* ---------- olaylar ---------- */
+document.addEventListener('click', e => {
+  const el = e.target.closest('[data-act]'); if (!el) return;
+  const id = el.dataset.id;
+  switch (el.dataset.act) {
+    case 'nav': view = el.dataset.v; render(); window.scrollTo(0, 0); break;
+    case 'del-inc': if (confirm('Bu gelir kaydı silinsin mi?')) { db.inc = db.inc.filter(x => x.id !== id); save(); render(); toast('Silindi'); } break;
+    case 'del-exp': if (confirm('Bu gider kaydı silinsin mi?\nMiktar girildiyse ilgili stok girişi de geri alınır.')) { db.exp = db.exp.filter(x => x.id !== id); db.mov = db.mov.filter(m => m.ref !== id); save(); render(); toast('Silindi'); } break;
+    case 'del-mov': if (confirm('Bu stok hareketi silinsin mi?')) { db.mov = db.mov.filter(m => m.id !== id); save(); render(); toast('Silindi'); } break;
+    case 'del-cat': if (confirm('Bu kalem silinsin mi?')) { db.cats = db.cats.filter(c => c.id !== id); save(); render(); toast('Silindi'); } break;
+    case 'theme': setTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark'); break;
+    case 'logout': try { sessionStorage.removeItem('kasaAuth'); } catch {} location.reload(); break;
+    case 'print': window.print(); break;
+    case 'csv': exportCSV(); toast('CSV indirildi — Excel ile açabilirsiniz'); break;
+    case 'backup': download(`kasa-yedek_${today()}.json`, JSON.stringify(db, null, 1), 'application/json'); toast('Yedek indirildi'); break;
+    case 'restore': $('#restoreFile').click(); break;
+    case 'reset':
+      if (confirm('TÜM gelir, gider ve stok kayıtları silinecek. Önce yedek almanız önerilir. Devam edilsin mi?') && prompt('Onay için SİL yazın') === 'SİL') {
+        db = seed(); save(); render(); toast('Tüm veriler silindi');
+      }
+      break;
+  }
+});
+document.addEventListener('change', e => {
+  const el = e.target;
+  if (el.dataset.cf) {
+    const c = db.cats.find(x => x.id === el.dataset.id); if (!c) return;
+    const f = el.dataset.cf, v = el.value.trim();
+    if (f === 'name' && !v) { el.value = c.name; return; }
+    c[f] = f === 'min' ? toNum(v) : v;
+    save(); toast('Güncellendi');
+  }
+});
+$('#restoreFile').addEventListener('change', e => {
+  const file = e.target.files[0]; if (!file) return;
+  const r = new FileReader();
+  r.onload = () => {
+    try {
+      const d = JSON.parse(r.result);
+      if (!Array.isArray(d.cats) || !Array.isArray(d.inc) || !Array.isArray(d.exp) || !Array.isArray(d.mov)) throw 0;
+      if (!confirm(`Yedekte ${d.inc.length} gelir, ${d.exp.length} gider kaydı var. Mevcut verilerin yerine yüklensin mi?`)) return;
+      d.settings ||= {name:'İşletmem', posRate:0};
+      db = d; save(); render(); toast('Yedek yüklendi');
+    } catch { toast('Geçersiz yedek dosyası'); }
+  };
+  r.readAsText(file); e.target.value = '';
+});
+$('#perSel').addEventListener('change', e => {
+  per.key = e.target.value;
+  if (per.key === 'custom') {
+    const [a, b] = [ymd(new Date(new Date().getFullYear(), new Date().getMonth(), 1)), today()];
+    per.from = $('#perFrom').value ||= a; per.to = $('#perTo').value ||= b;
+  }
+  $('#customRange').hidden = per.key !== 'custom';
+  render();
+});
+['#perFrom', '#perTo'].forEach(s => $(s).addEventListener('change', () => { per.from = $('#perFrom').value; per.to = $('#perTo').value; render(); }));
+
+/* ---------- çerçeve ---------- */
+function render() {
+  $('#nav').innerHTML = Object.entries(VIEWS).map(([k, [t, ic]]) => `<button class="nav-item ${k === view ? 'on' : ''}" data-act="nav" data-v="${k}">${I(ic)}<span>${t}</span></button>`).join('');
+  $('#viewTitle').textContent = VIEWS[view][0];
+  $('#bizName').textContent = db.settings.name;
+  document.title = VIEWS[view][0] + ' · ' + db.settings.name;
+  $('#perWrap').style.visibility = view === 'ayar' ? 'hidden' : '';
+  $('#main').innerHTML = R[view]();
+  AFTER[view] && AFTER[view]();
+}
+let tt;
+function toast(t) { const el = $('#toast'); el.textContent = t; el.classList.add('show'); clearTimeout(tt); tt = setTimeout(() => el.classList.remove('show'), 2400); }
+function setTheme(t) { document.documentElement.dataset.theme = t; try { localStorage.setItem('kasaTheme', t); } catch {} }
+function doLogin(e) {
+  e.preventDefault();
+  if ($('#pw').value === PASS) {
+    try { sessionStorage.setItem('kasaAuth', '1'); } catch {}
+    showApp();
+  } else {
+    $('#pwErr').textContent = 'Şifre hatalı'; $('#pw').value = ''; $('#pw').focus();
+  }
+  return false;
+}
+function showApp() { $('#login').hidden = true; $('#app').hidden = false; render(); }
+
+(function init() {
+  let t = null; try { t = localStorage.getItem('kasaTheme'); } catch {}
+  setTheme(t || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'));
+  document.querySelector('[data-act=theme]').innerHTML = I(IC.theme);
+  document.querySelector('[data-act=logout]').innerHTML = I(IC.out);
+  let ok = false; try { ok = sessionStorage.getItem('kasaAuth') === '1'; } catch {}
+  if (ok) showApp(); else $('#pw').focus();
+})();
+</script>
+</body>
+</html>
